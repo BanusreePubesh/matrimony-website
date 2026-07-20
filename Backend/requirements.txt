@@ -2,5 +2,6 @@ fastapi
 uvicorn
 python-multipart
 opencv-python
-deep_translator
 paddleocr
+deep_translator
+paddlepaddle
