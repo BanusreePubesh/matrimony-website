@@ -3,3 +3,4 @@ uvicorn
 python-multipart
 opencv-python
 deep_translator
+paddleocr
