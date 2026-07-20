@@ -4,8 +4,8 @@
 fastapi
 uvicorn
 python-multipart
-paddlepaddle==3.2.0
+opencv-python
 paddleocr
-opencv-python-headless
+paddlepaddle==3.2.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
 numpy
 pillow
