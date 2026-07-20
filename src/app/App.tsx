@@ -816,10 +816,11 @@ function RegisterStep1({ onNext, setPage, onOtpSent }: { onNext: (phone: string,
   );
 }
 
-function RegisterStep2({ onNextWithData, onBack, setPage }: { onNextWithData: (ocrText: string, file: File | null) => void; onBack: () => void; setPage: (p: Page) => void }) {
+function RegisterStep2({ onNextWithData, onBack, setPage }: { onNextWithData: (ocrText: string, ocrFields: Record<string,string>, file: File | null) => void; onBack: () => void; setPage: (p: Page) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [ocrText, setOcrText] = useState("");
+  const [ocrFields, setOcrFields] = useState<Record<string,string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -830,39 +831,44 @@ function RegisterStep2({ onNextWithData, onBack, setPage }: { onNextWithData: (o
     }
   };
 
-  const processFile = async (file: File) => {
-    setIsProcessing(true);
-    setOcrText("");
-    try {
-      const Tesseract = (await import('tesseract.js')).default;
-      if (file.type === 'application/pdf') {
-        const pdfjsLib = await import('pdfjs-dist');
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        const page = await pdf.getPage(1);
-        const viewport = page.getViewport({ scale: 1.5 });
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        if (context) {
-          await page.render({ canvasContext: context, viewport }).promise;
-          const { data } = await Tesseract.recognize(canvas, 'eng');
-          setOcrText(data.text);
-        }
-      } else {
-        const { data } = await Tesseract.recognize(file, 'eng');
-        setOcrText(data.text);
-      }
-    } catch (error) {
-      console.error('Error processing file:', error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+const processFile = async (file: File) => {
+  setIsProcessing(true);
+  setOcrText("");
+  setOcrFields({});
 
-  return (
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("http://127.0.0.1:8000/ocr", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("OCR failed");
+    }
+
+    const data = await response.json();
+    console.log("OCR data:", data);
+    console.log("OCR fields:", data.fields);
+    setOcrText(data.text || "");
+    setOcrFields(data.fields || {});
+
+  } catch (error) {
+    console.error("Error processing file:", error);
+    alert("OCR processing failed.");
+  } finally {
+    setIsProcessing(false);
+  }
+};
+const handleContinue = () => {
+  console.log("OCR Text:", ocrText);
+  console.log("OCR Fields:", ocrFields);
+  console.log("File:", file);
+  onNextWithData(ocrText, ocrFields, file);
+}; 
+ return (
     <div className="space-y-6">
       <div>
         <h2 className="font-display text-2xl font-bold text-slate-800">Register Free</h2>
@@ -895,7 +901,7 @@ function RegisterStep2({ onNextWithData, onBack, setPage }: { onNextWithData: (o
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-slate-800">{file.name}</span>
                 <span className="text-xs text-[#059669] mt-0.5">
-                  {(file.size / (1024 * 1024)).toFixed(1)} MB • {isProcessing ? "Scanning..." : "Linked & Verification Pending"}
+                  {(file.size / (1024 * 1024)) < 1 ? (file.size / 1024).toFixed(0) + " KB" : (file.size / (1024 * 1024)).toFixed(1) + " MB"} • {isProcessing ? "Scanning..." : "Linked & Verification Pending"}
                 </span>
               </div>
             </div>
@@ -928,14 +934,19 @@ function RegisterStep2({ onNextWithData, onBack, setPage }: { onNextWithData: (o
         >
           Back
         </button>
-        <button
-          onClick={() => onNextWithData(ocrText, file)}
-          disabled={isProcessing}
-          className="flex-[2] py-4 text-white font-semibold rounded-[2rem] shadow-sm transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-[#e11d48] to-[#9333ea] hover:opacity-90 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {isProcessing ? "Scanning..." : <>Continue <ArrowRight className="w-4 h-4" /></>}
-        </button>
-      </div>
+<button
+  onClick={() => handleContinue()}
+  disabled={isProcessing}
+  className="flex-[2] py-4 text-white font-semibold rounded-[2rem] shadow-sm transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-[#e11d48] to-[#9333ea] hover:opacity-90 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+>
+  {isProcessing ? (
+    "Scanning..."
+  ) : (
+    <>
+      Continue <ArrowRight className="w-4 h-4" />
+    </>
+  )}
+</button>      </div>
 
       <div className="text-center mt-6 pt-4">
         <p className="text-sm text-gray-500">
@@ -962,92 +973,135 @@ function extractFieldsFromOcr(text: string) {
     return "";
   };
   return {
-    name: extract([/name[:\s]+([A-Za-z\s]{3,30})/i, /([A-Z][a-z]+ [A-Z][a-z]+)/]),
-    dob: extract([/(?:dob|date of birth|birth date)[:\s]+([\d\-\/]+)/i, /(\d{4}[-\/]\d{2}[-\/]\d{2})/]),
-    birthTime: extract([/birth time[:\s]+([\d:apm\s]+)/i, /time[:\s]+([\d:apm\s]+)/i]),
-    birthPlace: extract([/birth place[:\s]+([A-Za-z\s,]{3,40})/i, /born at[:\s]+([A-Za-z\s,]+)/i]),
-    phone: extract([/(?:phone|mobile|contact)[:\s]+(\d{10,12})/i, /(\+?91[\s-]?\d{10})/]),
-    email: extract([/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/]),
-    rasi: extract([/rasi[:\s]+([A-Za-z]+)/i, /raasi[:\s]+([A-Za-z]+)/i]),
-    nakshatra: extract([/nakshatra[:\s]+([A-Za-z]+)/i, /star[:\s]+([A-Za-z]+)/i]),
-    dosham: extract([/dosham[:\s]+([A-Za-z\s]+)/i, /dosam[:\s]+([A-Za-z\s]+)/i]) || "None",
-    gotra: extract([/gotra[:\s]+([A-Za-z\s]+)/i, /gotram[:\s]+([A-Za-z\s]+)/i]),
-    motherTongue: extract([/mother tongue[:\s]+([A-Za-z]+)/i, /language[:\s]+([A-Za-z]+)/i]),
-    religion: extract([/religion[:\s]+([A-Za-z]+)/i]),
-    caste: extract([/caste[:\s]+([A-Za-z\s]+)/i, /community[:\s]+([A-Za-z\s]+)/i]),
-    subCaste: extract([/sub.?caste[:\s]+([A-Za-z\s]+)/i]),
-    familyType: extract([/family type[:\s]+([A-Za-z\s]+)/i]),
-    height: extract([/height[:\s]+([\d'."\scm]+)/i]),
-    weight: extract([/weight[:\s]+([\d\s]+kg?)/i]),
-    complexion: extract([/complexion[:\s]+([A-Za-z\s]+)/i, /skin[:\s]+([A-Za-z]+)/i]),
-    bloodGroup: extract([/blood[:\s]+([ABO][+-])/i, /blood group[:\s]+([ABO][+-])/i]),
-    annualIncome: extract([/income[:\s]+([\d,]+)/i, /salary[:\s]+([\d,]+)/i]),
-    education: extract([/education[:\s]+([A-Za-z\s.]+)/i, /qualification[:\s]+([A-Za-z\s.]+)/i]),
-    occupation: extract([/occupation[:\s]+([A-Za-z\s]+)/i, /job[:\s]+([A-Za-z\s]+)/i]),
-    fatherName: extract([/father'?s? name[:\s]+([A-Za-z\s]+)/i]),
-    fatherJob: extract([/father'?s? (?:job|occupation)[:\s]+([A-Za-z\s]+)/i]),
-    motherName: extract([/mother'?s? name[:\s]+([A-Za-z\s]+)/i]),
-    motherJob: extract([/mother'?s? (?:job|occupation)[:\s]+([A-Za-z\s]+)/i]),
-    brotherName: extract([/brothers?[:\s]+([A-Za-z\s&]+)/i]),
-    sisterName: extract([/sisters?[:\s]+([A-Za-z\s&]+)/i]),
-    city: extract([/city[:\s]+([A-Za-z\s]+)/i, /Chennai|Mumbai|Delhi|Bengaluru|Coimbatore/i]),
-    state: extract([/state[:\s]+([A-Za-z\s]+)/i, /Tamil Nadu|Karnataka|Maharashtra/i]),
-    country: extract([/country[:\s]+([A-Za-z\s]+)/i]) || "India",
-    address: extract([/address[:\s]+([A-Za-z0-9\s,./\-]{10,})/i]),
+    name: extract([/(?:Name|பெயர்)[\s:\-]+([^\n]+)/i, /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2}(?:\s+[A-Z])?)$/m]),
+    dob: extract([/(?:dob|date of birth|birth date|பிறந்த தேதி)[\s:\-]+([^\n]+)/i, /\b(\d{2}[-\/]\d{2}[-\/]\d{4})\b/]),
+    birthTime: extract([/(?:birth time|time|பிறந்த நேரம்)[\s:\-]+([^\n]+)/i, /\b(\d{2}[:\d]*\s*(?:AM|PM|am|pm))\b/i]),
+    birthPlace: extract([/(?:birth place|born at|பிறந்த இடம்)[\s:\-]+([^\n]+)/i]),
+    phone: extract([/(?:phone|mobile|contact)[\s:\-]+([^\n]+)/i, /\b(\d{10})\b/]),
+    email: extract([/(?:email|e-mail)[\s:\-]+([^\n]+)/i, /\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/]),
+    rasi: extract([/(?:rasi|raasi|ராசி)[\s:\-]+([^\n]+)/i, /\b(Mesham|Rishabam|Mithunam|Kadagam|Simmam|Kanni|Thulam|Viruchigam|Dhanusu|Magaram|Kumbam|Meenam)\b/i]),
+    nakshatra: extract([/(?:nakshatra|star|நட்சத்திரம்)[\s:\-]+([^\n]+)/i, /\b(Ashwini|Bharani|Krithika|Rohini|Mrigasira|Arudra|Punarvasu|Pushya|Aslesha|Magha|Pooram|Uttram|Hastam|Chithirai|Swathi|Visagam|Anusham|Jyeshta|Moolam|Pooradam|Uttaradam|Sravanam|Avittam|Sathayam|Poorattadhi|Uttarattadhi|Revathi)\b/i]),
+    dosham: extract([/(?:dosham|dosam|தோஷம்)[\s:\-]+([^\n]+)/i]) || "None",
+    gotra: extract([/(?:gotra|gotram)[\s:\-]+([^\n]+)/i]),
+    motherTongue: extract([/(?:mother tongue|language)[\s:\-]+([^\n]+)/i]),
+    religion: extract([/(?:religion|மதம்)[\s:\-]+([^\n]+)/i]),
+    caste: extract([/(?:caste|community|சாதி)[\s:\-]+([^\n]+)/i]),
+    subCaste: extract([/(?:sub.?caste)[\s:\-]+([^\n]+)/i]),
+    familyType: extract([/(?:family type)[\s:\-]+([^\n]+)/i]),
+    height: extract([/(?:height)[\s:\-]+([^\n]+)/i]),
+    weight: extract([/(?:weight)[\s:\-]+([^\n]+)/i]),
+    complexion: extract([/(?:complexion|skin)[\s:\-]+([^\n]+)/i]),
+    bloodGroup: extract([/(?:blood|blood group)[\s:\-]+([^\n]+)/i]),
+    annualIncome: extract([/(?:income|salary)[\s:\-]+([^\n]+)/i]),
+    education: extract([/(?:education|qualification)[\s:\-]+([^\n]+)/i]),
+    occupation: extract([/(?:occupation|job)[\s:\-]+([^\n]+)/i]),
+    fatherName: extract([/(?:father'?s? name)[\s:\-]+([^\n]+)/i]),
+    fatherJob: extract([/(?:father'?s? (?:job|occupation))[\s:\-]+([^\n]+)/i]),
+    motherName: extract([/(?:mother'?s? name)[\s:\-]+([^\n]+)/i]),
+    motherJob: extract([/(?:mother'?s? (?:job|occupation))[\s:\-]+([^\n]+)/i]),
+    brotherName: extract([/(?:brothers?)[\s:\-]+([^\n]+)/i]),
+    sisterName: extract([/(?:sisters?)[\s:\-]+([^\n]+)/i]),
+    city: extract([/(?:city)[\s:\-]+([^\n]+)/i]),
+    state: extract([/(?:state)[\s:\-]+([^\n]+)/i]),
+    country: extract([/(?:country)[\s:\-]+([^\n]+)/i]) || "India",
+    address: extract([/(?:address)[\s:\-]+([^\n]+)/i]),
   };
 }
 
 // ─── Register Form Details (Step 3 — OCR-filled editable form) ──────────────
-function RegisterFormDetails({ ocrText, horoscopeFile, phone, gender, onBack, onComplete, setPage }:
-  { ocrText: string; horoscopeFile: File | null; phone: string; gender: string; onBack: () => void; onComplete: () => void; setPage: (p: Page) => void }) {
+function RegisterFormDetails({ ocrText, ocrFields, horoscopeFile, phone, gender, onBack, onComplete, setPage }:
+  { ocrText: string; ocrFields: Record<string,string>; horoscopeFile: File | null; phone: string; gender: string; onBack: () => void; onComplete: () => void; setPage: (p: Page) => void }) {
 
-  const ex = extractFieldsFromOcr(ocrText);
+  // Merge: backend structured fields take priority, then frontend regex fallback on raw text
+  const rx = extractFieldsFromOcr(ocrText);
+  const f = ocrFields; // shorthand for backend fields
   const [submitting, setSubmitting] = useState(false);
 
   const [form, setForm] = useState({
-    name: ex.name || "", email: ex.email || "",
-    dob: ex.dob || "", birthTime: ex.birthTime || "",
-    birthPlace: ex.birthPlace || "", contactPhone: ex.phone || phone || "",
-    rasi: ex.rasi || "Mesham", nakshatra: ex.nakshatra || "Rohini", dosham: ex.dosham || "None",
-    gotra: ex.gotra || "", motherTongue: ex.motherTongue || "Tamil",
-    religion: ex.religion || "Hindu", caste: ex.caste || "", subCaste: ex.subCaste || "",
-    familyType: ex.familyType || "Joint Family",
-    height: ex.height || "", weight: ex.weight || "",
-    complexion: ex.complexion || "Fair", bloodGroup: ex.bloodGroup || "",
-    annualIncome: ex.annualIncome || "", education: ex.education || "", occupation: ex.occupation || "",
-    fatherName: ex.fatherName || "Name", fatherJob: ex.fatherJob || "",
-    motherName: ex.motherName || "Name", motherJob: ex.motherJob || "",
-    brotherName: ex.brotherName || "", sisterName: ex.sisterName || "",
-    city: ex.city || "", state: ex.state || "", country: ex.country || "India", address: ex.address || "",
+    name: f.name || rx.name || "",
+    email: f.email || rx.email || "",
+    dob: f.dob || rx.dob || "",
+    birthTime: f.birth_time || rx.birthTime || "",
+    birthPlace: f.birth_place || rx.birthPlace || "",
+    contactPhone: f.phone || rx.phone || phone || "",
+    rasi: f.rasi || rx.rasi || "Mesham",
+    nakshatra: f.nakshatra || rx.nakshatra || "Rohini",
+    dosham: f.dosham || rx.dosham || "None",
+    gotra: f.gotra || rx.gotra || "",
+    motherTongue: f.mother_tongue || rx.motherTongue || "Tamil",
+    religion: f.religion || rx.religion || "Hindu",
+    caste: f.caste || rx.caste || "",
+    subCaste: f.sub_caste || rx.subCaste || "",
+    familyType: f.family_type || rx.familyType || "Joint Family",
+    height: f.height || rx.height || "",
+    weight: f.weight || rx.weight || "",
+    complexion: f.complexion || rx.complexion || "Fair",
+    bloodGroup: f.blood_group || rx.bloodGroup || "",
+    annualIncome: f.annual_income || rx.annualIncome || "",
+    education: f.education || rx.education || "",
+    occupation: f.occupation || rx.occupation || "",
+    fatherName: f.father_name || rx.fatherName || "",
+    fatherJob: f.father_job || rx.fatherJob || "",
+    motherName: f.mother_name || rx.motherName || "",
+    motherJob: f.mother_job || rx.motherJob || "",
+    brotherName: f.brother || rx.brotherName || "",
+    sisterName: f.sister || rx.sisterName || "",
+    city: f.city || rx.city || "",
+    state: f.state || rx.state || "",
+    country: f.country || rx.country || "India",
+    address: f.address || rx.address || "",
   });
 
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [field]: e.target.value }));
 
-  const handleSubmit = async () => {
-    if (!form.name) { alert("Full name is required."); return; }
-    setSubmitting(true);
-    try {
-      const formData = new FormData();
-      Object.entries(form).forEach(([k, v]) => formData.append(k, v));
-      formData.append("phone", phone);
-      formData.append("gender", gender);
-      if (horoscopeFile) formData.append("horoscope", horoscopeFile);
-      const res = await fetch("http://localhost:5000/api/register", { method: "POST", body: formData });
-      const data = await res.json();
-      if (data.success) {
-        localStorage.setItem("vivahUser", JSON.stringify(data.user));
-        onComplete();
-      } else {
-        alert(data.error || data.message || "Registration failed.");
-      }
-    } catch {
-      localStorage.setItem("vivahUser", JSON.stringify({ id: Date.now(), name: form.name, phone, gender }));
-      onComplete();
-    } finally {
-      setSubmitting(false);
+const handleSubmit = async () => {
+    if (!form.name) {
+        alert("Full name is required.");
+        return;
     }
-  };
+
+    setSubmitting(true);
+
+    try {
+        const formData = new FormData();
+
+        Object.entries(form).forEach(([k, v]) => {
+            formData.append(k, v);
+        });
+
+        formData.append("phone", phone);
+        formData.append("gender", gender);
+
+        if (horoscopeFile) {
+            formData.append("horoscope", horoscopeFile);
+        }
+
+        const res = await fetch("http://localhost:5000/api/register", {
+    method: "POST",
+    body: formData
+});
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            alert(data.error || "Registration failed.");
+            return;
+        }
+
+        localStorage.setItem("vivahUser", JSON.stringify(data.user));
+
+        alert("Registration Successful!");
+
+        onComplete();
+
+    } catch (err) {
+        console.error(err);
+        alert("Unable to connect to the server.");
+    } finally {
+        setSubmitting(false);
+    }
+};
 
   const SectionTitle = ({ icon, title }: { icon: React.ReactNode; title: string }) => (
     <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
@@ -1495,6 +1549,7 @@ function RegisterPage({ step, setStep, setPage }: { step: number; setStep: (s: n
   const [regPhone, setRegPhone] = useState("");
   const [regGender, setRegGender] = useState("female");
   const [ocrText, setOcrText] = useState("");
+  const [ocrFields, setOcrFields] = useState<Record<string,string>>({});
   const [horoscopeFile, setHoroscopeFile] = useState<File | null>(null);
 
   return (
@@ -1521,8 +1576,9 @@ function RegisterPage({ step, setStep, setPage }: { step: number; setStep: (s: n
           )}
           {step === 2 && (
             <RegisterStep2
-              onNextWithData={(ocr, file) => {
+              onNextWithData={(ocr, fields, file) => {
                 setOcrText(ocr);
+                setOcrFields(fields);
                 setHoroscopeFile(file);
                 setStep(3);
               }}
@@ -1533,6 +1589,7 @@ function RegisterPage({ step, setStep, setPage }: { step: number; setStep: (s: n
           {step === 3 && (
             <RegisterFormDetails
               ocrText={ocrText}
+              ocrFields={ocrFields}
               horoscopeFile={horoscopeFile}
               phone={regPhone}
               gender={regGender}

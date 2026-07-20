@@ -50,7 +50,21 @@ console.log("Meta API Config - Template Name:", process.env.WHATSAPP_TEMPLATE_NA
 // 1. Send OTP Endpoint
 app.post('/api/otp/send', async (req, res) => {
   const { phone } = req.body;
-  
+  console.log("Phone received:", phone);
+
+const user = await db.query(
+    "SELECT id FROM users WHERE phone = ?",
+    [phone]
+);
+
+console.log("User found:", user);
+
+if (user) {
+    return res.status(409).json({
+        success: false,
+        message: "This mobile number is already registered."
+    });
+}
   if (!phone || phone.length !== 10) {
     return res.status(400).json({ success: false, message: "Invalid phone number" });
   }
@@ -202,13 +216,64 @@ app.post('/api/register', upload.single('horoscope'), async (req, res) => {
         rasi, nakshatra, dosham, img, horoscope_path, premium_plan, views_used, interests_used, status, verified
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Basic', 0, 0, 'Active', 1)
     `;
+console.log({
+  phone,
+  name,
+  gender,
+  age,
+  city,
+  state,
+  country,
+  pincode,
+  religion,
+  caste,
+  education,
+  job,
+  salary,
+  height,
+  complexion,
+  rasi,
+  nakshatra,
+  dosham,
+  profileImg,
+  horoscopePath
+});
 
-    const result = await db.run(sql, [
-      phone, name, gender.toLowerCase(), age ? parseInt(age) : null, city, state, country, pincode,
-      religion, caste, education, job, salary, height, complexion,
-      rasi, nakshatra, dosham, profileImg, horoscopePath
-    ]);
+// Check if phone number already exists
+const [existingUser] = await db.query(
+  "SELECT id FROM users WHERE phone = ?",
+  [phone]
+);
 
+if (existingUser.length > 0) {
+  return res.status(409).json({
+    success: false,
+    error: "This mobile number is already registered."
+  });
+}
+const result = await db.run(sql, [
+  phone ?? null,
+  name ?? null,
+  gender ? gender.toLowerCase() : null,
+  age ? parseInt(age) : null,
+  city ?? null,
+  state ?? null,
+  country ?? null,
+  pincode ?? null,
+  religion ?? null,
+  caste ?? null,
+  education ?? null,
+  job ?? null,
+  salary ?? null,
+  height ?? null,
+  complexion ?? null,
+  rasi ?? null,
+  nakshatra ?? null,
+  dosham ?? null,
+  profileImg ?? null,
+  horoscopePath ?? null
+]);
+console.log("Insert Result:", result);
     const [newUsers] = await db.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
 
     res.json({
@@ -219,7 +284,7 @@ app.post('/api/register', upload.single('horoscope'), async (req, res) => {
 
   } catch (error) {
     console.error("Registration Error:", error);
-    res.status(500).json({ success: false, error: "Registration failed. Mobile number might already be registered." });
+    res.status(500).json({ success: false, error: "Registration Error:" });
   }
 });
 
