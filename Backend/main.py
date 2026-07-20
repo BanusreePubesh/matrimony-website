@@ -128,7 +128,7 @@ app.add_middleware(
 )
 
 # ocr = PaddleOCR(use_angle_cls=True, lang="ta")
-ocr = PaddleOCR(use_angle_cls=True, lang='en', backend='transformers')
+ocr = PaddleOCR(use_angle_cls=True, lang='en')
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
