@@ -7,6 +7,7 @@ import shutil
 import sys
 from contextlib import asynccontextmanager
 from difflib import SequenceMatcher
+from paddleocr import PaddleOCR
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -19,6 +20,7 @@ from google.genai import types
 from paddleocr import PaddleOCR
 from deep_translator import GoogleTranslator
 
+ocr = PaddleOCR(use_angle_cls=False, lang='en')
 try:
     import pytesseract
     from PIL import Image
