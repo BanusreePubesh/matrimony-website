@@ -6,3 +6,4 @@ pillow
 pytesseract
 numpy
 deep-translator
+python-dotenv
