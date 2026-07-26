@@ -8,3 +8,4 @@ numpy
 deep-translator
 python-dotenv
 google-genai
+paddleocr
