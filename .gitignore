@@ -1,0 +1,10 @@
+node_modules/
+dist/
+
+__pycache__/
+*.pyc
+
+Backend/uploads/
+Backend/ocr_output.txt
+
+.env
