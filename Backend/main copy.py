@@ -766,17 +766,31 @@ async def extract_text(file: UploadFile = File(...)):
                 m_name = getattr(m, "name", "")
                 supported_methods = getattr(m, "supported_generation_methods", [])
                 if m_name and "gemini" in m_name.lower() and ("generateContent" in supported_methods or not supported_methods):
+                    lower_name = m_name.lower()
+                    if any(bad in lower_name for bad in ["-tts", "embed", "aqa", "imagen", "bison"]):
+                        continue
                     available_models.append(m_name)
         except Exception as l_err:
             print("Error listing models from API:", l_err)
 
-        model_candidates = available_models if available_models else [
-            "gemini-2.5-flash",
+        preferred_models = [
+            "gemini-3.6-flash",
+            "models/gemini-3.6-flash",
             "gemini-2.0-flash",
             "models/gemini-2.0-flash",
             "gemini-1.5-flash",
-            "models/gemini-1.5-flash"
+            "models/gemini-1.5-flash",
+            "gemini-3.1-pro-preview",
+            "models/gemini-3.1-pro-preview",
+            "gemini-2.5-flash",
+            "gemini-1.5-pro",
+            "models/gemini-1.5-pro"
         ]
+
+        # Prioritize preferred working models
+        model_candidates = [m for m in preferred_models if m in available_models] + [m for m in available_models if m not in preferred_models]
+        if not model_candidates:
+            model_candidates = preferred_models
 
         response = None
         for model_name in model_candidates:

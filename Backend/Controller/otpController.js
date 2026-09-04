@@ -42,7 +42,7 @@ export const sendOtp = async (req, res) => {
     try {
         // Send via WhatsApp
         await client.messages.create({
-            body: `Your VivahShaadi verification code is: ${code}`,
+            body: `Your MERCURY CONNECT verification code is: ${code}`,
             from: 'whatsapp:+14155238886', // Your Twilio WhatsApp Sandbox number
             to: `whatsapp:+91${phone}`
         });

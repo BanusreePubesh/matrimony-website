@@ -1,9 +1,12 @@
-import axios from 'axios';
-
+import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://matrimony-website-otp-backend.onrender.com/api",
+  baseURL: `${import.meta.env.VITE_API_URL}/api`,
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
+
 // ─── Auth & OTP ───────────────────────────────────────────────────────────────
 export const sendOtp = (phone) => api.post('/otp/send', { phone });
 export const verifyOtp = (phone, otp) => api.post('/otp/verify', { phone, otp });

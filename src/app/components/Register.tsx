@@ -345,17 +345,32 @@ function RegisterStep1({ onNext, setPage, onOtpSent }: { onNext: () => void; set
   const [gender, setGender] = useState<"bride" | "groom">("bride");
   const [phone, setPhone] = useState("");
 
+  // const handleSendOtp = () => {
+  //   if (phone.length === 10) {
+  //     setSendingOtp(true);
+  //     const code = String(Math.floor(1000 + Math.random() * 9000));
+  //     setTimeout(() => {
+  //       setSendingOtp(false);
+  //       onOtpSent(code);
+  //       onNext();
+  //     }, 1500);
+  //   }
+  // };
+
   const handleSendOtp = () => {
-    if (phone.length === 10) {
-      setSendingOtp(true);
-      const code = String(Math.floor(1000 + Math.random() * 9000));
-      setTimeout(() => {
-        setSendingOtp(false);
-        onOtpSent(code);
-        onNext();
-      }, 1500);
-    }
-  };
+  if (phone.length === 10) {
+    setSendingOtp(true);
+
+    // TESTING ONLY
+    const code = "1234";
+
+    setTimeout(() => {
+      setSendingOtp(false);
+      onOtpSent(code);
+      onNext();
+    }, 500);
+  }
+};
 
   return (
     <div className="space-y-5">
@@ -399,8 +414,8 @@ function RegisterStep1({ onNext, setPage, onOtpSent }: { onNext: () => void; set
             disabled={sendingOtp}
             className={`py-3.5 px-4 text-center font-bold text-sm rounded-xl border-2 transition-all duration-200 cursor-pointer ${
               gender === "bride"
-                ? "border-emerald-500 text-emerald-600 bg-emerald-50/10"
-                : "border-gray-200 text-gray-400 hover:border-gray-300"
+                ? "border-[#1D72B8] text-[#003B7B] bg-sky-50/60 shadow-sm ring-2 ring-[#1D72B8]/20"
+                : "border-slate-200 text-slate-500 hover:border-slate-300"
             }`}
           >
             Bride / பெண்
@@ -411,8 +426,8 @@ function RegisterStep1({ onNext, setPage, onOtpSent }: { onNext: () => void; set
             disabled={sendingOtp}
             className={`py-3.5 px-4 text-center font-bold text-sm rounded-xl border-2 transition-all duration-200 cursor-pointer ${
               gender === "groom"
-                ? "border-emerald-500 text-emerald-600 bg-emerald-50/20"
-                : "border-gray-200 text-gray-400 hover:border-gray-300"
+                ? "border-[#1D72B8] text-[#003B7B] bg-sky-50/60 shadow-sm ring-2 ring-[#1D72B8]/20"
+                : "border-slate-200 text-slate-500 hover:border-slate-300"
             }`}
           >
             Groom / ஆண்
@@ -423,10 +438,10 @@ function RegisterStep1({ onNext, setPage, onOtpSent }: { onNext: () => void; set
       <button
           onClick={handleSendOtp}
           disabled={sendingOtp || phone.length !== 10}
-          className={`w-full py-3.5 mt-4 text-white font-semibold rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          className={`w-full py-4 mt-4 text-white font-bold text-base rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer ${
             sendingOtp || phone.length !== 10
-              ? "bg-emerald-400 cursor-not-allowed opacity-70"
-              : "bg-emerald-600 hover:bg-emerald-700 hover:shadow-md"
+              ? "bg-slate-300 text-slate-500 cursor-not-allowed opacity-70"
+              : "bg-gradient-to-r from-[#003B7B] via-[#1D72B8] to-[#56B7EE] hover:opacity-95"
           }`}
         >
           {sendingOtp ? (
@@ -446,11 +461,11 @@ function RegisterStep1({ onNext, setPage, onOtpSent }: { onNext: () => void; set
         </button>
 
       <div className="text-center mt-6">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-slate-500">
           Already have an account?{" "}
           <button
             onClick={() => setPage("login")}
-            className="font-semibold text-emerald-600 hover:text-emerald-700 transition-colors bg-transparent border-none p-0 cursor-pointer"
+            className="font-bold text-[#1D72B8] hover:text-[#003B7B] transition-colors bg-transparent border-none p-0 cursor-pointer"
           >
             Login
           </button>
@@ -498,7 +513,7 @@ function RegisterOtpStep({ onNext, onBack, setPage, otpCode }: { onNext: () => v
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-emerald-400 mb-0.5">WhatsApp Notification</p>
-              <p className="text-sm font-bold text-white">VivahShaadi OTP Verification</p>
+              <p className="text-sm font-bold text-white">MERCURY CONNECT OTP Verification</p>
               <p className="text-xs text-gray-300 mt-0.5">Your registration OTP code is: {otpCode}</p>
               <button
                 onClick={() => {
@@ -542,7 +557,7 @@ function RegisterOtpStep({ onNext, onBack, setPage, otpCode }: { onNext: () => v
                 document.getElementById(`reg-otp-${i - 1}`)?.focus();
               }
             }}
-            className="w-14 h-14 text-center border-2 border-gray-200 rounded-xl text-xl font-bold focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-white text-slate-800 transition-all"
+            className="w-14 h-14 text-center border-2 border-slate-200 rounded-xl text-xl font-bold focus:outline-none focus:border-[#1D72B8] focus:ring-2 focus:ring-sky-200 bg-white text-slate-800 transition-all"
           />
         ))}
       </div>
@@ -550,8 +565,8 @@ function RegisterOtpStep({ onNext, onBack, setPage, otpCode }: { onNext: () => v
       <button
         onClick={onNext}
         disabled={!filled}
-        className={`w-full py-3.5 text-white font-semibold rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
-          filled ? "bg-emerald-600 hover:bg-emerald-700 hover:shadow-md" : "bg-emerald-300 cursor-not-allowed"
+        className={`w-full py-4 text-white font-bold text-base rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          filled ? "bg-gradient-to-r from-[#003B7B] via-[#1D72B8] to-[#56B7EE] hover:opacity-95" : "bg-slate-300 text-slate-500 cursor-not-allowed opacity-70"
         }`}
       >
         Verify OTP & Continue
@@ -560,25 +575,25 @@ function RegisterOtpStep({ onNext, onBack, setPage, otpCode }: { onNext: () => v
       <div className="flex gap-3">
         <button
           onClick={onBack}
-          className="flex-1 py-3 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 transition-colors cursor-pointer text-sm"
+          className="flex-1 py-3 border border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 transition-colors cursor-pointer text-sm"
         >
           Back
         </button>
         <button
           onClick={handleResend}
           disabled={resending}
-          className="flex-1 py-3 border border-emerald-200 text-emerald-600 font-semibold rounded-xl hover:bg-emerald-50 transition-colors cursor-pointer text-sm disabled:opacity-60"
+          className="flex-1 py-3 border border-sky-300 text-[#1D72B8] font-semibold rounded-xl hover:bg-sky-50 transition-colors cursor-pointer text-sm disabled:opacity-60"
         >
           {resending ? "Resending..." : "Resend OTP"}
         </button>
       </div>
 
       <div className="text-center">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-slate-500">
           Already have an account?{" "}
           <button
             onClick={() => setPage("login")}
-            className="font-semibold text-emerald-600 hover:text-emerald-700 transition-colors bg-transparent border-none p-0 cursor-pointer"
+            className="font-bold text-[#1D72B8] hover:text-[#003B7B] transition-colors bg-transparent border-none p-0 cursor-pointer"
           >
             Login
           </button>
@@ -846,7 +861,7 @@ function RegisterPage({ step, setStep, setPage }: { step: number; setStep: (s: n
             <div className="w-8 h-8 rounded-full bg-[#10b981] flex items-center justify-center">
               <Heart className="w-4 h-4 text-white fill-white" />
             </div>
-            <span className="font-display font-bold text-xl text-teal-800">VivahShaadi</span>
+            <span className="font-display font-bold text-xl text-teal-800"></span>
           </div>
           <p className="text-gray-500 text-sm">Create your free profile in minutes</p>
         </div>

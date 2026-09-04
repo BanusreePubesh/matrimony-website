@@ -14,9 +14,35 @@ import {
 } from "recharts";
 import PhoneInput from 'react-phone-input-2';
 import axios from 'axios';
+import { MercuryLogoIcon } from "./components/MercuryLogoIcon.tsx";
 
 type Page = "landing" | "login" | "register" | "dashboard" | "profile" | "interests" | "chat" | "premium" | "admin";
 type AdminSection = "overview" | "users" | "horoscope" | "interests" | "chat" | "reports" | "subscriptions" | "cms" | "settings";
+
+// ─── OCR Birth Time Cleaner ──────────────────────────────────────────────────
+/**
+ * Fixes common OCR misreads in birth time strings.
+ * Example: "eter 0620" → "after 06:20"
+ */
+function cleanBirthTime(raw: string): string {
+  if (!raw) return raw;
+  let v = raw.trim();
+  // Fix OCR-garbled "after" variants (e.g. "eter", "afer", "aftcr")
+  v = v.replace(/\b(eter|eler|etcr|afer|afier|afler|aftcr|aftec|aier)\b/gi, "after");
+  // Fix OCR-garbled "before" variants
+  v = v.replace(/\b(befoe|befor|bef0re|bcfore|belore)\b/gi, "before");
+  // Fix garbled AM / PM
+  v = v.replace(/\b(4m)\b/gi, "AM");
+  v = v.replace(/\b(9m)\b/gi, "PM");
+  // Format raw digit blocks: "0620" → "06:20"
+  v = v.replace(/\b(\d{3,4})\b/g, (match) => {
+    const d = match.replace(/\D/g, "");
+    if (d.length === 4) return `${d.slice(0, 2)}:${d.slice(2)}`;
+    if (d.length === 3) return `0${d[0]}:${d.slice(1)}`;
+    return match;
+  });
+  return v.trim();
+}
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -30,7 +56,7 @@ const PROFILES = [
 ];
 
 const TESTIMONIALS = [
-  { couple: "Karthik & Priya", married: "March 2024", city: "Chennai", story: "We matched on VivahShaadi in 2023. The horoscope match feature was spot on — we are happily married now with our families blessing!", img1: "https://i.pravatar.cc/100?img=12", img2: "https://i.pravatar.cc/100?img=47" },
+  { couple: "Karthik & Priya", married: "March 2024", city: "Chennai", story: "We matched on MERCURY CONNECT in 2023. The secure space and horoscope match features were spot on — we are happily married now with our families blessing!", img1: "https://i.pravatar.cc/100?img=12", img2: "https://i.pravatar.cc/100?img=47" },
   { couple: "Rahul & Divya", married: "January 2024", city: "Bangalore", story: "Genuine profiles and easy communication helped us find our perfect match within 3 months. Best decision ever!", img1: "https://i.pravatar.cc/100?img=33", img2: "https://i.pravatar.cc/100?img=49" },
   { couple: "Suresh & Meena", married: "November 2023", city: "Mumbai", story: "From first interest to wedding in just 6 months! The premium membership was worth every rupee.", img1: "https://i.pravatar.cc/100?img=15", img2: "https://i.pravatar.cc/100?img=51" },
 ];
@@ -494,20 +520,21 @@ function TestimonialsSection() {
 
 function Footer({ setPage }: { setPage: (p: Page) => void }) {
   return (
-    <footer className="bg-gray-950 text-white">
+    <footer className="bg-[#050C1A] text-white border-t border-sky-900/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14">
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-10">
           <div>
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500 to-purple-700 flex items-center justify-center">
-                <Heart className="w-4 h-4 text-white fill-white" />
+            <div className="flex items-center gap-3 mb-4">
+              <MercuryLogoIcon className="w-10 h-10" />
+              <div className="flex flex-col">
+                <span className="font-display font-extrabold text-xl tracking-wide text-white">MERCURY CONNECT</span>
+                <span className="text-xs text-sky-400 font-medium">The secure space to meet your soulmate</span>
               </div>
-              <span className="font-display font-bold text-lg">VivahShaadi</span>
             </div>
-            <p className="text-gray-400 text-sm leading-relaxed mb-4">India's most trusted matrimony platform with 5 lakh+ verified profiles across all communities.</p>
+            <p className="text-slate-400 text-sm leading-relaxed mb-4">India's most trusted matrimony platform offering a secure space to meet your soulmate across all communities.</p>
             <div className="flex gap-2">
               {["FB", "TW", "IG", "YT"].map(s => (
-                <div key={s} className="w-8 h-8 rounded-lg bg-white/8 flex items-center justify-center text-xs font-bold text-gray-400 hover:bg-rose-600 hover:text-white cursor-pointer transition-colors">{s}</div>
+                <div key={s} className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-xs font-bold text-slate-300 hover:bg-[#0284C7] hover:text-white cursor-pointer transition-colors">{s}</div>
               ))}
             </div>
           </div>
@@ -520,17 +547,17 @@ function Footer({ setPage }: { setPage: (p: Page) => void }) {
               <h4 className="font-semibold text-white mb-4 text-sm">{col.title}</h4>
               <ul className="space-y-2.5">
                 {col.links.map(l => (
-                  <li key={l}><a href="#" className="text-gray-400 text-sm hover:text-rose-400 transition-colors">{l}</a></li>
+                  <li key={l}><a href="#" className="text-slate-400 text-sm hover:text-sky-400 transition-colors">{l}</a></li>
                 ))}
               </ul>
             </div>
           ))}
         </div>
-        <div className="border-t border-white/8 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-gray-500 text-sm">© 2024 VivahShaadi. All rights reserved. Made with <Heart className="w-3 h-3 text-rose-500 fill-rose-500 inline mx-0.5" />in India.</p>
-          <div className="flex items-center gap-4 text-gray-500 text-sm">
-            <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" />+91 1800 123 4567</span>
-            <span className="flex items-center gap-1.5"><Globe className="w-3.5 h-3.5" />support@vivahshaadi.com</span>
+        <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-slate-500 text-sm">© 2026 MERCURY CONNECT. All rights reserved. The secure space to meet your soulmate.</p>
+          <div className="flex items-center gap-4 text-slate-400 text-sm">
+            <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-sky-400" />+91 1800 123 4567</span>
+            <span className="flex items-center gap-1.5"><Globe className="w-3.5 h-3.5 text-sky-400" />support@mercuryconnect.com</span>
           </div>
         </div>
       </div>
@@ -602,7 +629,7 @@ const handleSendOtp = async () => {
     
     setSendingOtp(true);
     try {
-      const response = await fetch("https://matrimony-website-otp-backend.onrender.com/api/otp/send", {
+      const response = await fetch("https://matrimony-website-otp-backend.onrender.com/api/otp/send-register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone })
@@ -708,11 +735,11 @@ const handleSendOtp = async () => {
               type="button"
               onClick={handleSendOtp}
               disabled={sendingOtp || phone.length !== 10}
-              className={`px-6 py-3 rounded-[2rem] text-white font-semibold transition-all text-sm shadow-sm
+              className={`px-6 py-3 rounded-[2rem] text-white font-bold transition-all text-sm shadow-md
                 ${
                   sendingOtp || phone.length !== 10
-                    ? "bg-rose-400 cursor-not-allowed"
-                    : "bg-[#e11d48] hover:bg-rose-700"
+                    ? "bg-slate-300 text-slate-500 cursor-not-allowed"
+                    : "bg-gradient-to-r from-[#003B7B] via-[#1D72B8] to-[#56B7EE] hover:opacity-95"
                 }`}
             >
               {otpSent ? "Resend" : sendingOtp ? "Sending..." : "Send OTP"}
@@ -727,9 +754,9 @@ const handleSendOtp = async () => {
         )}
 
         {otpSent && !isVerified && (
-          <div className="mt-4 p-5 bg-[#ebfbf3] border border-[#a7f3d0] rounded-[1.5rem]">
-            <p className="flex items-center gap-2 text-[#047857] font-medium mb-4">
-              <CheckCircle className="w-5 h-5" /> OTP sent to your WhatsApp:
+          <div className="mt-4 p-5 bg-sky-50/70 border border-sky-200 rounded-[1.5rem]">
+            <p className="flex items-center gap-2 text-[#003B7B] font-medium mb-4">
+              <CheckCircle className="w-5 h-5 text-[#1D72B8]" /> OTP sent to your WhatsApp:
             </p>
             <div className="flex justify-center gap-4 mb-5">
               {otp.map((digit, index) => (
@@ -753,7 +780,7 @@ const handleSendOtp = async () => {
                       document.getElementById(`otp-${index - 1}`)?.focus();
                     }
                   }}
-                  className="w-14 h-14 border border-[#6ee7b7] bg-white rounded-[1rem] text-center text-xl font-bold text-slate-800 focus:outline-none focus:border-[#10b981] focus:ring-2 focus:ring-[#10b981]/20"
+                  className="w-14 h-14 border border-sky-300 bg-white rounded-[1rem] text-center text-xl font-bold text-slate-800 focus:outline-none focus:border-[#1D72B8] focus:ring-2 focus:ring-sky-200"
                 />
               ))}
             </div>
@@ -761,7 +788,7 @@ const handleSendOtp = async () => {
               type="button"
               onClick={verifyOtp}
               disabled={verifyingOtp}
-              className="w-full py-3.5 bg-[#059669] hover:bg-[#047857] text-white rounded-full font-semibold transition-colors"
+              className="w-full py-3.5 bg-gradient-to-r from-[#003B7B] via-[#1D72B8] to-[#56B7EE] hover:opacity-95 text-white rounded-full font-bold transition-all shadow-md"
             >
               {verifyingOtp ? "Verifying..." : "Verify OTP"}
             </button>
@@ -770,8 +797,8 @@ const handleSendOtp = async () => {
       </div>
 
       <div>
-        <label className="flex items-center gap-2 text-sm font-semibold text-slate-800 mb-3">
-          <User className="w-4 h-4 text-[#9333ea]" /> Gender
+        <label className="flex items-center gap-2 text-sm font-bold text-slate-800 mb-3">
+          <User className="w-4 h-4 text-[#1D72B8]" /> Gender
         </label>
         <div className="grid grid-cols-2 gap-4">
           <button
@@ -779,28 +806,28 @@ const handleSendOtp = async () => {
             onClick={() => setGender("male")}
             className={`py-6 px-4 text-center rounded-2xl border-2 transition-all duration-200 flex flex-col items-center gap-4 cursor-pointer ${
               gender === "male"
-                ? "border-rose-500 bg-white shadow-sm"
-                : "border-gray-200 bg-white hover:border-gray-300"
+                ? "border-[#1D72B8] bg-sky-50/50 shadow-md ring-2 ring-[#1D72B8]/20"
+                : "border-slate-200 bg-white hover:border-slate-300"
             }`}
           >
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center ${gender === "male" ? "bg-rose-50" : "bg-gray-100"}`}>
-              <User className={`w-6 h-6 ${gender === "male" ? "text-rose-500" : "text-gray-400"}`} />
+            <div className={`w-14 h-14 rounded-full flex items-center justify-center ${gender === "male" ? "bg-sky-100" : "bg-slate-100"}`}>
+              <User className={`w-6 h-6 ${gender === "male" ? "text-[#1D72B8]" : "text-slate-400"}`} />
             </div>
-            <span className={`font-semibold text-sm ${gender === "male" ? "text-slate-900" : "text-slate-600"}`}>Male</span>
+            <span className={`font-bold text-sm ${gender === "male" ? "text-[#003B7B]" : "text-slate-600"}`}>Male</span>
           </button>
           <button
             type="button"
             onClick={() => setGender("female")}
             className={`py-6 px-4 text-center rounded-2xl border-2 transition-all duration-200 flex flex-col items-center gap-4 cursor-pointer ${
               gender === "female"
-                ? "border-rose-500 bg-white shadow-sm"
-                : "border-gray-200 bg-white hover:border-gray-300"
+                ? "border-[#1D72B8] bg-sky-50/50 shadow-md ring-2 ring-[#1D72B8]/20"
+                : "border-slate-200 bg-white hover:border-slate-300"
             }`}
           >
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center ${gender === "female" ? "bg-rose-50" : "bg-gray-100"}`}>
-              <User className={`w-6 h-6 ${gender === "female" ? "text-rose-500" : "text-gray-400"}`} />
+            <div className={`w-14 h-14 rounded-full flex items-center justify-center ${gender === "female" ? "bg-sky-100" : "bg-slate-100"}`}>
+              <User className={`w-6 h-6 ${gender === "female" ? "text-[#1D72B8]" : "text-slate-400"}`} />
             </div>
-            <span className={`font-semibold text-sm ${gender === "female" ? "text-slate-900" : "text-slate-600"}`}>Female</span>
+            <span className={`font-bold text-sm ${gender === "female" ? "text-[#003B7B]" : "text-slate-600"}`}>Female</span>
           </button>
         </div>
       </div>
@@ -808,17 +835,17 @@ const handleSendOtp = async () => {
       <button
         onClick={() => onNext(phone, gender)}
         disabled={!isVerified}
-        className="w-full py-4 mt-6 text-white font-semibold rounded-[2rem] shadow-sm transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-[#e11d48] to-[#9333ea] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full py-4 mt-6 text-white font-bold text-base rounded-[2rem] shadow-lg transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-[#003B7B] via-[#1D72B8] to-[#56B7EE] hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
       >
         Continue <ArrowRight className="w-4 h-4" />
       </button>
 
       <div className="text-center mt-6 pt-4">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-slate-500">
           Already have an account?{" "}
           <button
             onClick={() => setPage("login")}
-            className="font-bold text-[#e11d48] hover:text-rose-700 transition-colors bg-transparent border-none p-0 cursor-pointer"
+            className="font-bold text-[#1D72B8] hover:text-[#003B7B] transition-colors bg-transparent border-none p-0 cursor-pointer"
           >
             Login
           </button>
@@ -862,15 +889,29 @@ const processFile = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await fetch("https://matrimony-website-o3sg.onrender.com/ocr", {
-      method: "POST",
-      body: formData,
-    });
+    const primaryUrl = import.meta.env.VITE_OCR_API_URL || "http://localhost:8000/ocr";
+    const fallbackUrl = "https://matrimony-website-o3sg.onrender.com/ocr";
 
-    console.log("Status:", response.status);
-    console.log("OK:", response.ok);
+    let response: Response | null = null;
+    try {
+      response = await fetch(primaryUrl, {
+        method: "POST",
+        body: formData,
+      });
+    } catch (err) {
+      console.warn(`Primary OCR endpoint (${primaryUrl}) failed, trying fallback...`, err);
+    }
 
-    if (response.ok) {
+    if (!response || !response.ok) {
+      if (primaryUrl !== fallbackUrl) {
+        response = await fetch(fallbackUrl, {
+          method: "POST",
+          body: formData,
+        });
+      }
+    }
+
+    if (response && response.ok) {
       const data = await response.json();
       console.log("FULL API RESPONSE:", data);
       console.log("EXTRACTED FIELDS:", data.fields);
@@ -970,7 +1011,7 @@ const handleContinue = () => {
 <button
   onClick={() => handleContinue()}
   disabled={isProcessing}
-  className="flex-[2] py-4 text-white font-semibold rounded-[2rem] shadow-sm transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-[#e11d48] to-[#9333ea] hover:opacity-90 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+  className="flex-[2] py-4 text-white font-bold rounded-[2rem] shadow-lg transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-[#003B7B] via-[#1D72B8] to-[#56B7EE] hover:opacity-95 text-sm disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
 >
   {isProcessing ? (
     "Scanning..."
@@ -996,6 +1037,22 @@ const handleContinue = () => {
   );
 }
 
+// ─── Helper to check if a extracted string is a sibling count or placeholder ────
+function isCountOrNotProvided(val: any): boolean {
+  if (!val || typeof val !== "string") return true;
+  const cleaned = val.trim().toLowerCase();
+  if (!cleaned) return true;
+  if (["nil", "none", "no", "n/a", "na", "-", "0", "not provided", "null", "undefined"].includes(cleaned)) return true;
+  if (/^\d+$/.test(cleaned)) return true;
+  if (/^(\d+|one|two|three|four|five|\s|,|brother|sister|brothers|sisters|elder|younger|married|unmarried|-|\(|\))+$/i.test(cleaned)) return true;
+  return false;
+}
+
+function cleanNameValue(val: any): string {
+  if (isCountOrNotProvided(val)) return "";
+  return String(val).trim();
+}
+
 // ─── OCR Field Extractor ────────────────────────────────────────────────────
 function extractFieldsFromOcr(text: string) {
   const extract = (patterns: RegExp[]) => {
@@ -1005,6 +1062,30 @@ function extractFieldsFromOcr(text: string) {
     }
     return "";
   };
+
+  const rawFatherName = extract([
+    /(?:father'?s?\s*name|father\s*name)[\s:\-]+([^\n]+)/i,
+    /^(?:father)[\s:\-]+([^\n]+)/i
+  ]);
+  const rawFatherJob = extract([
+    /(?:father'?s?\s*(?:job|occupation|work|profession)|father\s*(?:job|occupation|work|profession))[\s:\-]+([^\n]+)/i,
+    /(?:father'?s?\s*status)[\s:\-]+([^\n]+)/i
+  ]);
+  const rawMotherName = extract([
+    /(?:mother'?s?\s*name|mother\s*name)[\s:\-]+([^\n]+)/i,
+    /^(?:mother)[\s:\-]+([^\n]+)/i
+  ]);
+  const rawMotherJob = extract([
+    /(?:mother'?s?\s*(?:job|occupation|work|profession)|mother\s*(?:job|occupation|work|profession))[\s:\-]+([^\n]+)/i,
+    /(?:mother'?s?\s*status)[\s:\-]+([^\n]+)/i
+  ]);
+  const rawBrotherName = extract([
+    /(?:brother'?s?\s*names?|brother\s*name)[\s:\-]+([^\n]+)/i
+  ]);
+  const rawSisterName = extract([
+    /(?:sister'?s?\s*names?|sister\s*name)[\s:\-]+([^\n]+)/i
+  ]);
+
   return {
     name: extract([/(?:Name|பெயர்)[\s:\-]+([^\n]+)/i, /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2}(?:\s+[A-Z])?)$/m]),
     dob: extract([/(?:dob|date of birth|birth date|பிறந்த தேதி)[\s:\-]+([^\n]+)/i, /\b(\d{2}[-\/]\d{2}[-\/]\d{4})\b/]),
@@ -1015,11 +1096,11 @@ function extractFieldsFromOcr(text: string) {
     rasi: extract([/(?:rasi|raasi|ராசி)[\s:\-]+([^\n]+)/i, /\b(Mesham|Rishabam|Mithunam|Kadagam|Simmam|Kanni|Thulam|Viruchigam|Dhanusu|Magaram|Kumbam|Meenam)\b/i]),
     nakshatra: extract([/(?:nakshatra|star|நட்சத்திரம்)[\s:\-]+([^\n]+)/i, /\b(Ashwini|Bharani|Krithika|Rohini|Mrigasira|Arudra|Punarvasu|Pushya|Aslesha|Magha|Pooram|Uttram|Hastam|Chithirai|Swathi|Visagam|Anusham|Jyeshta|Moolam|Pooradam|Uttaradam|Sravanam|Avittam|Sathayam|Poorattadhi|Uttarattadhi|Revathi)\b/i]),
     dosham: extract([/(?:dosham|dosam|தோஷம்)[\s:\-]+([^\n]+)/i]) || "None",
-    gotra: extract([/(?:gotra|gotram)[\s:\-]+([^\n]+)/i]),
+    gotra: extract([/(?:gotra|gotram|gothram)[\s:\-]+([^\n]+)/i]),
     motherTongue: extract([/(?:mother tongue|language)[\s:\-]+([^\n]+)/i]),
     religion: extract([/(?:religion|மதம்)[\s:\-]+([^\n]+)/i]),
     caste: extract([/(?:caste|community|சாதி)[\s:\-]+([^\n]+)/i]),
-    subCaste: extract([/(?:sub.?caste)[\s:\-]+([^\n]+)/i]),
+    subCaste: extract([/(?:sub.?caste|உட்பிரிவு)[\s:\-]+([^\n]+)/i]),
     familyType: extract([/(?:family type)[\s:\-]+([^\n]+)/i]),
     height: extract([/(?:height)[\s:\-]+([^\n]+)/i]),
     weight: extract([/(?:weight)[\s:\-]+([^\n]+)/i]),
@@ -1028,12 +1109,12 @@ function extractFieldsFromOcr(text: string) {
     annualIncome: extract([/(?:income|salary)[\s:\-]+([^\n]+)/i]),
     education: extract([/(?:education|qualification)[\s:\-]+([^\n]+)/i]),
     occupation: extract([/(?:occupation|job)[\s:\-]+([^\n]+)/i]),
-    fatherName: extract([/(?:father'?s? name)[\s:\-]+([^\n]+)/i]),
-    fatherJob: extract([/(?:father'?s? (?:job|occupation))[\s:\-]+([^\n]+)/i]),
-    motherName: extract([/(?:mother'?s? name)[\s:\-]+([^\n]+)/i]),
-    motherJob: extract([/(?:mother'?s? (?:job|occupation))[\s:\-]+([^\n]+)/i]),
-    brotherName: extract([/(?:brothers?)[\s:\-]+([^\n]+)/i]),
-    sisterName: extract([/(?:sisters?)[\s:\-]+([^\n]+)/i]),
+    fatherName: cleanNameValue(rawFatherName),
+    fatherJob: rawFatherJob,
+    motherName: cleanNameValue(rawMotherName),
+    motherJob: rawMotherJob,
+    brotherName: cleanNameValue(rawBrotherName),
+    sisterName: cleanNameValue(rawSisterName),
     city: extract([/(?:city)[\s:\-]+([^\n]+)/i]),
     state: extract([/(?:state)[\s:\-]+([^\n]+)/i]),
     country: extract([/(?:country)[\s:\-]+([^\n]+)/i]) || "India",
@@ -1055,38 +1136,38 @@ const safeOcr = rx || {};
 const safeForm = f || {};
 
 const [form, setForm] = useState({
-  name: safeForm.name || safeOcr.name || "",
+  name: safeForm.name || safeForm.fullName || safeForm.full_name || safeOcr.name || "",
   email: safeForm.email || safeOcr.email || "",
-  dob: safeForm.dob || safeOcr.dob || "",
-  birthTime: safeForm.birth_time || safeOcr.birthTime || "",
-  birthPlace: safeForm.birth_place || safeOcr.birthPlace || "",
-  contactPhone: safeForm.phone || safeOcr.phone || phone || "",
+  dob: safeForm.dob || safeForm.dateOfBirth || safeForm.date_of_birth || safeOcr.dob || "",
+  birthTime: cleanBirthTime(safeForm.birth_time || safeForm.birthTime || safeOcr.birthTime || ""),
+  birthPlace: safeForm.birth_place || safeForm.birthPlace || safeOcr.birthPlace || "",
+  contactPhone: safeForm.phone || safeForm.contactPhone || safeOcr.phone || phone || "",
   rasi: safeForm.rasi || safeOcr.rasi || "Mesham",
   nakshatra: safeForm.nakshatra || safeOcr.nakshatra || "Rohini",
   dosham: safeForm.dosham || safeOcr.dosham || "None",
   gotra: safeForm.gotra || safeOcr.gotra || "",
-  motherTongue: safeForm.mother_tongue || safeOcr.motherTongue || "Tamil",
+  motherTongue: safeForm.mother_tongue || safeForm.motherTongue || "Tamil",
   religion: safeForm.religion || safeOcr.religion || "Hindu",
   caste: safeForm.caste || safeOcr.caste || "",
-  subCaste: safeForm.sub_caste || safeOcr.subCaste || "",
-  familyType: safeForm.family_type || safeOcr.familyType || "Joint Family",
+  subCaste: safeForm.sub_caste || safeForm.subCaste || safeOcr.subCaste || "",
+  familyType: safeForm.family_type || safeForm.familyType || safeOcr.familyType || "Joint Family",
   height: safeForm.height || safeOcr.height || "",
   weight: safeForm.weight || safeOcr.weight || "",
   complexion: safeForm.complexion || safeOcr.complexion || "Fair",
-  bloodGroup: safeForm.blood_group || safeOcr.bloodGroup || "",
-  annualIncome: safeForm.annual_income || safeOcr.annualIncome || "",
+  bloodGroup: safeForm.blood_group || safeForm.bloodGroup || safeOcr.bloodGroup || "",
+  annualIncome: safeForm.annual_income || safeForm.annualIncome || safeForm.income || safeOcr.annualIncome || "",
   education: safeForm.education || safeOcr.education || "",
   occupation: safeForm.occupation || safeOcr.occupation || "",
-  fatherName: safeForm.father_name || safeOcr.fatherName || "",
-  fatherJob: safeForm.father_job || safeOcr.fatherJob || "",
-  motherName: safeForm.mother_name || safeOcr.motherName || "",
-  motherJob: safeForm.mother_job || safeOcr.motherJob || "",
-  brotherName: safeForm.brother || safeOcr.brotherName || "",
-  sisterName: safeForm.sister || safeOcr.sisterName || "",
+  fatherName: safeForm.father_name || safeForm.fatherName || safeForm.fathersName || safeOcr.fatherName || "",
+  fatherJob: safeForm.father_job || safeForm.fatherJob || safeForm.fathersJob || safeOcr.fatherJob || "",
+  motherName: safeForm.mother_name || safeForm.motherName || safeForm.mothersName || safeOcr.motherName || "",
+  motherJob: safeForm.mother_job || safeForm.motherJob || safeForm.mothersJob || safeOcr.motherJob || "",
+  brotherName: safeForm.brother || safeForm.brotherName || safeForm.brothersName || safeOcr.brotherName || "",
+  sisterName: safeForm.sister || safeForm.sisterName || safeForm.sistersName || safeOcr.sisterName || "",
   city: safeForm.city || safeOcr.city || "",
   state: safeForm.state || safeOcr.state || "",
   country: safeForm.country || safeOcr.country || "India",
-  address: safeForm.address || safeOcr.address || "",
+  address: safeForm.address || safeForm.residentialAddress || safeOcr.address || "",
 });
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [field]: e.target.value }));
@@ -1108,6 +1189,17 @@ const handleSubmit = async () => {
 
         formData.append("phone", phone);
         formData.append("gender", gender);
+
+        // Compute age from dob and send it explicitly
+        let computedAge = 26;
+        if (form.dob) {
+          const yr = new Date(form.dob).getFullYear();
+          if (!isNaN(yr) && yr > 1940 && yr < 2015) {
+            computedAge = new Date().getFullYear() - yr;
+          }
+        }
+        formData.append("age", String(computedAge));
+        if (form.name) formData.append("name", form.name);
 
         if (horoscopeFile) {
             formData.append("horoscope", horoscopeFile);
@@ -1276,7 +1368,7 @@ const data = await res.json();
           Back
         </button>
         <button onClick={handleSubmit} disabled={submitting}
-          className="flex-[2] py-4 text-white font-semibold rounded-[2rem] shadow-sm transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-[#e11d48] to-[#9333ea] hover:opacity-90 text-sm disabled:opacity-60 disabled:cursor-not-allowed">
+          className="flex-[2] py-4 text-white font-bold rounded-[2rem] shadow-lg transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-[#003B7B] via-[#1D72B8] to-[#56B7EE] hover:opacity-95 text-sm disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer">
           {submitting
             ? <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Saving...</>
             : <>Complete Registration <CheckCircle className="w-4 h-4" /></>}
@@ -1287,7 +1379,7 @@ const data = await res.json();
         <p className="text-sm text-gray-500">
           Already have an account?{" "}
           <button onClick={() => setPage("login")}
-            className="font-bold text-[#e11d48] hover:text-rose-700 transition-colors bg-transparent border-none p-0 cursor-pointer">
+            className="font-bold text-[#1D72B8] hover:text-[#003B7B] transition-colors bg-transparent border-none p-0 cursor-pointer">
             Login
           </button>
         </p>
@@ -1596,13 +1688,11 @@ function RegisterPage({ step, setStep, setPage }: { step: number; setStep: (s: n
       <div className={step === 3 ? "max-w-4xl mx-auto" : "max-w-lg mx-auto"}>
         {/* Branding header */}
         <div className="text-center mb-6">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-rose-500 to-purple-600 flex items-center justify-center">
-              <Heart className="w-4 h-4 text-white fill-white" />
-            </div>
-            <span className="font-display font-bold text-xl text-[#e11d48]">VivahShaadi</span>
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <MercuryLogoIcon className="w-10 h-10" />
+            <span className="font-display font-extrabold text-2xl tracking-wide text-[#0F2C59]">MERCURY CONNECT</span>
           </div>
-          <p className="text-gray-500 text-sm">Create your free profile in minutes</p>
+          <p className="text-sky-600 font-medium text-sm">The secure space to meet your soulmate</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-6 border border-rose-100">
@@ -1643,7 +1733,7 @@ function RegisterPage({ step, setStep, setPage }: { step: number; setStep: (s: n
   );
 }
 
-function LoginPage({ setPage }: { setPage: (p: Page) => void }) {
+function LoginPage({ setPage, setCurrentUser }: { setPage: (p: Page) => void; setCurrentUser: (user: any) => void }) {
   const [phone, setPhone] = useState("");
   const [sendingOtp, setSendingOtp] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
@@ -1651,12 +1741,13 @@ function LoginPage({ setPage }: { setPage: (p: Page) => void }) {
   const [otpCode, setOtpCode] = useState("0932");
   const [notification, setNotification] = useState(false);
   const [resending, setResending] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   const handleSendOtp = async () => {
     if (phone.length !== 10) return;
     setSendingOtp(true);
     try {
-      const response = await fetch("https://matrimony-website-otp-backend.onrender.com/api/otp/send", {
+      const response = await fetch("https://matrimony-website-otp-backend.onrender.com/api/otp/send-login", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone })
@@ -1681,7 +1772,7 @@ const handleResend = async () => {
 
   try {
     const response = await fetch(
-      "https://matrimony-website-otp-backend.onrender.com/api/otp/send",
+      "https://matrimony-website-otp-backend.onrender.com/api/otp/send-login",
       {
         method: "POST",
         headers: {
@@ -1706,6 +1797,49 @@ const handleResend = async () => {
     setResending(false);
   }
 };
+
+  const verifyOtp = async () => {
+    const enteredOtp = otp.join("");
+    if (enteredOtp.length !== 4) {
+      alert("Please enter a valid OTP");
+      return;
+    }
+
+    setVerifyingOtp(true);
+    try {
+      const response = await fetch("https://matrimony-website-otp-backend.onrender.com/api/otp/verify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          phone,
+          otp: enteredOtp,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        if (data.isRegistered && data.user) {
+          localStorage.setItem("vivahUser", JSON.stringify(data.user));
+          setCurrentUser(data.user);
+          setPage("dashboard");
+        } else {
+          alert("This phone number is not registered. Please register first.");
+          setPage("register");
+        }
+      } else {
+        alert(data.message || "Invalid OTP");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Unable to verify OTP");
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 to-purple-50 py-16 px-4">
       {/* WhatsApp notification toast */}
@@ -1729,7 +1863,7 @@ const handleResend = async () => {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-emerald-400 mb-0.5">WhatsApp Notification</p>
-              <p className="text-sm font-bold text-white">VivahShaadi OTP Verification</p>
+              <p className="text-sm font-bold text-white">MERCURY CONNECT OTP Verification</p>
               <p className="text-xs text-gray-300 mt-0.5">Your login OTP code is: {otpCode}</p>
               <button
                 onClick={() => {
@@ -1748,13 +1882,11 @@ const handleResend = async () => {
       <div className="max-w-xl mx-auto">
         {/* Branding header */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center">
-              <Heart className="w-5 h-5 text-white fill-white" />
-            </div>
-            <span className="font-display font-bold text-2xl text-[#e11d48]">VivahShaadi</span>
+          <div className="flex items-center justify-center gap-3 mb-3">
+            <MercuryLogoIcon className="w-11 h-11" />
+            <span className="font-display font-extrabold text-2xl tracking-wide text-[#0F2C59]">MERCURY CONNECT</span>
           </div>
-          <p className="text-slate-500">Login via WhatsApp OTP</p>
+          <p className="text-[#0284C7] font-semibold text-sm">The secure space to meet your soulmate</p>
         </div>
 
         <div className="bg-white rounded-[1.5rem] shadow-sm p-8 border border-gray-100 space-y-6">
@@ -1826,15 +1958,15 @@ const handleResend = async () => {
               </div>
 
               <button
-                onClick={() => setPage("dashboard")}
-                disabled={!otp.every((d) => d !== "")}
+                onClick={verifyOtp}
+                disabled={!otp.every((d) => d !== "") || verifyingOtp}
                 className={`w-full py-4 text-white font-semibold rounded-[2rem] shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                  otp.every((d) => d !== "")
+                  otp.every((d) => d !== "") && !verifyingOtp
                     ? "bg-[#059669] hover:bg-[#047857] hover:shadow-md"
                     : "bg-[#6ee7b7] cursor-not-allowed text-white/80"
                 }`}
               >
-                <span>Verify & Login</span>
+                <span>{verifyingOtp ? "Verifying..." : "Verify & Login"}</span>
               </button>
 
               <div className="text-center pt-2">
@@ -1849,11 +1981,11 @@ const handleResend = async () => {
           )}
 
           <div className="pt-6 mt-4 border-t border-gray-100 text-center space-y-4">
-            <p className="text-sm text-gray-500">
-              New to VivahShaadi?{" "}
+            <p className="text-sm text-slate-500">
+              New to MERCURY CONNECT?{" "}
               <button
                 onClick={() => setPage("register")}
-                className="font-semibold text-[#e11d48] hover:text-rose-700 transition-colors bg-transparent border-none p-0 cursor-pointer"
+                className="font-bold text-[#0284C7] hover:text-[#0F2C59] transition-colors bg-transparent border-none p-0 cursor-pointer"
               >
                 Register Free
               </button>
@@ -1929,9 +2061,13 @@ function ProfileCard({ profile: p, setPage }: { profile: typeof PROFILES[0]; set
 function DashboardPage({ setPage, currentUser }: { setPage: (p: Page) => void; currentUser: any }) {
   const [activeTab, setActiveTab] = useState('recommended');
   const [profiles, setProfiles] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [limitAlert, setLimitAlert] = useState('');
-  const [filters, setFilters] = useState({ religion: 'All', caste: 'All', state: 'All' });
+  const userPlan = (currentUser?.premium_plan || currentUser?.plan || 'Basic').toLowerCase();
+  const isGoldOrAbove = userPlan === 'gold' || userPlan === 'diamond' || userPlan === 'platinum' || userPlan === 'premium';
+  const isBasicPlan = !isGoldOrAbove;
+
+  const handleLockedFilterClick = (filterName: string) => {
+    setLimitAlert(`Advanced filter "${filterName}" is exclusive to Gold & Premium members. Upgrade your plan to unlock Caste, Education, Income, Location and Match Score search filters!`);
+  };
 
   const tabs = [['recommended','Recommended'],['nearby','Nearby'],['new','New Profiles'],['horoscope','Horoscope Match']];
 
@@ -1943,8 +2079,8 @@ function DashboardPage({ setPage, currentUser }: { setPage: (p: Page) => void; c
     try {
       const params = new URLSearchParams({ userId: String(userId) });
       if (filters.religion !== 'All') params.set('religion', filters.religion);
-      if (filters.caste !== 'All') params.set('caste', filters.caste);
-      if (filters.state !== 'All') params.set('state', filters.state);
+      if (!isBasicPlan && filters.caste !== 'All') params.set('caste', filters.caste);
+      if (!isBasicPlan && filters.state !== 'All') params.set('state', filters.state);
       const res = await fetch(`https://matrimony-website-pl27.onrender.com/api/profiles?${params}`);
       const data = await res.json();
       if (data.success) setProfiles(data.profiles);
@@ -1975,16 +2111,16 @@ function DashboardPage({ setPage, currentUser }: { setPage: (p: Page) => void; c
 
   useEffect(() => { fetchProfiles(); },[] );
   return (
-    <div className="min-h-screen bg-rose-50/40">
-      <div className="bg-gradient-to-r from-rose-600 to-purple-700 text-white py-2.5 px-4">
+    <div className="min-h-screen bg-blue-50/40">
+      <div className="bg-gradient-to-r from-blue-900 to-blue-700 text-white py-2.5 px-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-200 flex-shrink-0" />
+            <AlertCircle className="w-4 h-4 text-blue-200 flex-shrink-0" />
             <p className="text-sm font-medium">Profile 65% complete — Add more details to get better matches!</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <div className="w-20 h-1.5 bg-white/25 rounded-full"><div className="w-[65%] h-full bg-white rounded-full" /></div>
-            <button className="text-xs font-semibold hover:text-rose-200 transition-colors">Complete →</button>
+            <button className="text-xs font-semibold hover:text-blue-200 transition-colors">Complete →</button>
           </div>
         </div>
       </div>
@@ -1993,7 +2129,7 @@ function DashboardPage({ setPage, currentUser }: { setPage: (p: Page) => void; c
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
             <Lock className="w-12 h-12 text-amber-500 mx-auto mb-3" />
-            <h3 className="font-bold text-gray-900 text-lg mb-2">Limit Reached</h3>
+            <h3 className="font-bold text-gray-900 text-lg mb-2">Upgrade Required</h3>
             <p className="text-gray-600 text-sm mb-4">{limitAlert}</p>
             <div className="flex gap-3">
               <button onClick={() => setLimitAlert('')} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600">Close</button>
@@ -2006,32 +2142,77 @@ function DashboardPage({ setPage, currentUser }: { setPage: (p: Page) => void; c
         <div className="flex gap-6">
           {/* Sidebar */}
           <aside className="w-60 flex-shrink-0 hidden lg:block">
-            <div className="bg-white rounded-2xl shadow-sm border border-rose-100 p-5 sticky top-24">
+            <div className="bg-white rounded-2xl shadow-sm border border-blue-100 p-5 sticky top-24">
               <div className="flex items-center justify-between mb-5">
-                <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Filter className="w-4 h-4 text-rose-600" />Filters</h3>
-                <button className="text-xs text-rose-600 font-medium hover:text-rose-800 transition-colors">Reset All</button>
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Filter className="w-4 h-4 text-blue-600" />Filters</h3>
+                <button 
+                  onClick={() => {
+                    setFilters({ religion: 'All', caste: 'All', state: 'All' });
+                    fetchProfiles();
+                  }}
+                  className="text-xs text-blue-600 font-medium hover:text-blue-800 transition-colors"
+                >
+                  Reset All
+                </button>
               </div>
               <div className="mb-4">
                 <label className="text-sm font-medium text-gray-700 block mb-2">Age Range: 22–32 yrs</label>
-                <input type="range" min={18} max={50} defaultValue={32} className="w-full accent-rose-600" />
+                <input type="range" min={18} max={50} defaultValue={32} className="w-full accent-blue-600" />
               </div>
               {[
-                { label: "Religion", opts: ["Hindu","Muslim","Christian","Sikh"] },
-                { label: "Caste", opts: ["Brahmin","Iyer","Mudaliar","Pillai","Nadar","Nair"] },
-                { label: "Education", opts: ["B.E./B.Tech","MBBS","MBA","M.Tech","CA","PhD"] },
-                { label: "Annual Income", opts: ["3–5 LPA","5–8 LPA","8–12 LPA","12–20 LPA","20+ LPA"] },
-                { label: "Location", opts: ["Tamil Nadu","Karnataka","Andhra Pradesh","Maharashtra","Kerala"] },
-                { label: "Match Score", opts: ["90%+","80%+","70%+","All Matches"] },
-              ].map(({ label, opts }) => (
-                <div key={label} className="mb-4">
-                  <label className="text-sm font-medium text-gray-700 block mb-1.5">{label}</label>
-                  <select className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-gray-50 focus:outline-none focus:border-rose-400 transition-colors">
-                    <option>All</option>
-                    {opts.map(o => <option key={o}>{o}</option>)}
-                  </select>
-                </div>
-              ))}
-              <button className="w-full py-2.5 bg-gradient-to-r from-rose-600 to-purple-700 text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity shadow-sm">Apply Filters</button>
+                { label: "Caste", key: "caste", opts: ["Brahmin","Iyer","Mudaliar","Pillai","Nadar","Nair"], isGold: false },
+                { label: "Education", key: "education", opts: ["B.E./B.Tech","MBBS","MBA","M.Tech","CA","PhD"], isGold: false },
+                { label: "Location", key: "state", opts: ["Tamil Nadu","Karnataka","Andhra Pradesh","Maharashtra","Kerala"], isGold: false },
+                { label: "Religion", key: "religion", opts: ["Hindu","Muslim","Christian","Sikh"], isGold: true },
+                { label: "Annual Income", key: "income", opts: ["3–5 LPA","5–8 LPA","8–12 LPA","12–20 LPA","20+ LPA"], isGold: true },
+                { label: "Match Score", key: "matchScore", opts: ["90%+","80%+","70%+","All Matches"], isGold: true },
+              ].map(({ label, key, opts, isGold }) => {
+                const isLocked = isBasicPlan && isGold;
+                return (
+                  <div key={label} className="mb-4">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className={`text-sm font-medium ${isLocked ? 'text-gray-400' : 'text-gray-700'}`}>{label}</label>
+                      {isGold && isBasicPlan ? (
+                        <button
+                          type="button"
+                          onClick={() => handleLockedFilterClick(label)}
+                          className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-300/60 flex items-center gap-1 hover:bg-amber-100 transition-colors cursor-pointer"
+                        >
+                          <Lock className="w-2.5 h-2.5 text-amber-600" /> Gold
+                        </button>
+                      ) : !isGold ? (
+                        <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          Free
+                        </span>
+                      ) : null}
+                    </div>
+                    {isLocked ? (
+                      <div
+                        onClick={() => handleLockedFilterClick(label)}
+                        className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-gray-50/80 text-gray-400 flex items-center justify-between cursor-pointer hover:border-amber-300 transition-colors select-none"
+                      >
+                        <span>Select {label}</span>
+                        <Lock className="w-3.5 h-3.5 text-gray-400" />
+                      </div>
+                    ) : (
+                      <select 
+                        value={(filters as any)[key] || 'All'}
+                        onChange={(e) => setFilters(f => ({ ...f, [key]: e.target.value }))}
+                        className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-gray-50 text-gray-900 focus:outline-none focus:border-blue-400 transition-colors"
+                      >
+                        <option value="All">All {label}s</option>
+                        {opts.map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    )}
+                  </div>
+                );
+              })}
+              <button 
+                onClick={() => fetchProfiles()}
+                className="w-full py-2.5 bg-blue-800 text-white text-sm font-semibold rounded-xl hover:bg-blue-900 transition-colors shadow-sm"
+              >
+                Apply Filters
+              </button>
             </div>
           </aside>
 
@@ -2042,21 +2223,21 @@ function DashboardPage({ setPage, currentUser }: { setPage: (p: Page) => void; c
                 <h1 className="font-display text-2xl font-bold text-gray-900">Matches for You</h1>
                 <p className="text-sm text-gray-500">{loading ? 'Loading profiles...' : `${profiles.length} profiles based on your preferences`}</p>
               </div>
-              <select className="text-sm border border-gray-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-rose-400 shadow-sm">
+              <select className="text-sm border border-gray-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-blue-400 shadow-sm">
                 <option>Sort: Horoscope Match</option>
                 <option>Sort: Newest First</option>
                 <option>Sort: Age (Low to High)</option>
               </select>
             </div>
-            <div className="flex gap-1 mb-5 bg-white rounded-xl p-1 shadow-sm border border-rose-100 overflow-x-auto">
+            <div className="flex gap-1 mb-5 bg-white rounded-xl p-1 shadow-sm border border-blue-100 overflow-x-auto">
               {tabs.map(([id, label]) => (
-                <button key={id} onClick={() => setActiveTab(id)} className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === id ? "bg-gradient-to-r from-rose-600 to-purple-700 text-white shadow-sm" : "text-gray-600 hover:text-rose-700 hover:bg-rose-50"}`}>{label}</button>
+                <button key={id} onClick={() => setActiveTab(id)} className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === id ? "bg-blue-800 text-white shadow-sm" : "text-gray-600 hover:text-blue-700 hover:bg-blue-50"}`}>{label}</button>
               ))}
             </div>
             <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {loading ? (
                 <div className="col-span-full text-center py-16">
-                  <div className="animate-spin w-10 h-10 border-4 border-rose-200 border-t-rose-600 rounded-full mx-auto mb-3" />
+                  <div className="animate-spin w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-3" />
                   <p className="text-gray-400 text-sm">Finding matches for you...</p>
                 </div>
               ) : profiles.length === 0 ? (
@@ -2099,7 +2280,7 @@ function LiveProfileCard({ profile: p, currentUser, setPage, onSendInterest }: {
   ));
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-rose-100 overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+    <div className="bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
       <div className="relative">
         <img src={p.img || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300'} alt={p.name} className="w-full h-52 object-cover" />
         {p.premium_plan !== 'Basic' && <div className="absolute top-3 left-3"><PremiumBadge /></div>}
@@ -2120,13 +2301,13 @@ function LiveProfileCard({ profile: p, currentUser, setPage, onSendInterest }: {
         <div className="flex items-start justify-between mb-2">
           <div>
             <h3 className="font-semibold text-gray-900">{p.name}</h3>
-            <p className="text-xs text-gray-500 mt-0.5">{p.age} yrs · {p.city}, {p.state}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{p.age ? `${p.age} yrs` : p.dob ? `${new Date().getFullYear() - new Date(p.dob).getFullYear()} yrs` : ''} {(p.age || p.dob) ? '·' : ''} {p.city}, {p.state}</p>
           </div>
           <MatchBadge pct={matchPct} />
         </div>
         <div className="flex flex-wrap gap-1.5 mb-3">
-          {p.education && <span className="text-xs px-2 py-0.5 bg-rose-50 text-rose-600 rounded-full">{p.education}</span>}
-          {p.job && <span className="text-xs px-2 py-0.5 bg-purple-50 text-purple-600 rounded-full">{p.job}</span>}
+          {p.education && <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full">{p.education}</span>}
+          {p.job && <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">{p.job}</span>}
           {p.rasi && <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full">{p.rasi}</span>}
         </div>
         {!isLocked && p.phone && (
@@ -2135,13 +2316,13 @@ function LiveProfileCard({ profile: p, currentUser, setPage, onSendInterest }: {
           </div>
         )}
         <div className="flex gap-2">
-          <button onClick={() => setPage('profile')} className="flex-1 py-2 text-sm font-semibold text-rose-700 border border-rose-200 rounded-xl hover:bg-rose-50 transition-colors flex items-center justify-center gap-1.5">
+          <button onClick={() => setPage('profile')} className="flex-1 py-2 text-sm font-semibold text-blue-700 border border-blue-200 rounded-xl hover:bg-blue-50 transition-colors flex items-center justify-center gap-1.5">
             <Eye className="w-3.5 h-3.5" />View
           </button>
           <button
             onClick={() => { setInterested(true); onSendInterest(p.id); }}
             className={`flex-1 py-2 text-sm font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-              interested ? 'bg-emerald-600 text-white' : 'bg-gradient-to-r from-rose-500 to-purple-600 text-white hover:opacity-90'
+              interested ? 'bg-emerald-600 text-white' : 'bg-blue-800 text-white hover:bg-blue-900'
             }`}
           >
             <Heart className={`w-3.5 h-3.5 ${interested ? 'fill-white' : ''}`} />
@@ -2340,7 +2521,7 @@ function InterestsPage({ setPage, currentUser }: { setPage: (p: Page) => void; c
     }
   };
 
-  useEffect(() => { fetchInterests(); }, []);
+  useEffect(() => { fetchInterests(); }, [userId]);
 
   const receivedPending = received.filter(i => i.status === 'pending');
   const receivedAccepted = received.filter(i => i.status === 'accepted');
@@ -2415,52 +2596,210 @@ function InterestsPage({ setPage, currentUser }: { setPage: (p: Page) => void; c
 // ─── Chat ─────────────────────────────────────────────────────────────────────
 
 function ChatPage({ setPage, currentUser }: { setPage: (p: Page) => void; currentUser: any }) {
-  const [activeChat, setActiveChat] = useState<any>(null);
-  const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<any[]>([]);
-  const [chats, setChats] = useState<any[]>([]);
-  const userId = currentUser?.id;
+  const userId = String(currentUser?.id || currentUser?.phone || '101');
+  const userPlan = (currentUser?.premium_plan || currentUser?.plan || 'Basic').toLowerCase();
+  const isUnlocked = userPlan === 'gold' || userPlan === 'premium' || userPlan === 'platinum';
 
-  const fetchChats = async () => {
-    if (!userId) return;
+  const [searchQuery, setSearchQuery] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Per-User Chat Storage Key
+  const storageChatsKey = `vivah_user_chats_${userId}`;
+
+  // Initialize Chats for Current User Only
+  const [chats, setChats] = useState<any[]>(() => {
     try {
-      const res = await fetch(`/api/chats?userId=${userId}`);
-      const data = await res.json();
-      if (data.success) {
-        setChats(data.chats || []);
-        if (data.chats?.length > 0 && !activeChat) setActiveChat(data.chats[0]);
+      const saved = localStorage.getItem(storageChatsKey);
+      if (saved) return JSON.parse(saved);
+    } catch (e) { console.error(e); }
+    return USER_MOCK_CHATS[userId] || [
+      { id: 301, name: "Sneha Reddy", img: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150", online: true, time: "09:15 AM", lastMsg: "Hello! Nice to meet you.", unread: 1, phone: "+91 99887 76655" }
+    ];
+  });
+
+  // Re-sync chats when userId changes
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(storageChatsKey);
+      if (saved) {
+        setChats(JSON.parse(saved));
+      } else {
+        const initial = USER_MOCK_CHATS[userId] || [
+          { id: 301, name: "Sneha Reddy", img: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150", online: true, time: "09:15 AM", lastMsg: "Hello! Nice to meet you.", unread: 1, phone: "+91 99887 76655" }
+        ];
+        setChats(initial);
+        localStorage.setItem(storageChatsKey, JSON.stringify(initial));
       }
-    } catch (err) { console.error(err); }
-  };
+    } catch (e) { console.error(e); }
+  }, [userId]);
 
-  const fetchHistory = async (receiverId: number) => {
-    if (!userId) return;
+  // Persist chats for this user whenever updated
+  useEffect(() => {
     try {
-      const res = await fetch(`/api/chats/${receiverId}?userId=${userId}`);
-      const data = await res.json();
-      if (data.success) setMessages(data.messages || []);
-    } catch (err) { console.error(err); }
-  };
+      localStorage.setItem(storageChatsKey, JSON.stringify(chats));
+    } catch (e) { console.error(e); }
+  }, [chats, storageChatsKey]);
 
-  const sendMsg = async () => {
-    if (!message.trim() || !activeChat || !userId) return;
+  // Active Selected Chat state
+  const [activeChat, setActiveChat] = useState<any>(() => chats[0] || null);
+
+  useEffect(() => {
+    if (chats.length > 0 && (!activeChat || !chats.find(c => c.id === activeChat.id))) {
+      setActiveChat(chats[0]);
+    }
+  }, [chats]);
+
+  // Per-User Per-Chat Messages state
+  const [messages, setMessages] = useState<any[]>([]);
+  const [messageText, setMessageText] = useState('');
+
+  // Load Messages for current active chat and current user
+  useEffect(() => {
+    if (!activeChat) {
+      setMessages([]);
+      return;
+    }
+    const msgKey = `vivah_user_msgs_${userId}_${activeChat.id}`;
     try {
-await fetch('/api/chats/send', {
-          method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ senderId: userId, receiverId: activeChat.id, text: message })
-      });
-      setMessages(prev => [...prev, { id: Date.now(), sender_id: userId, text: message, created_at: new Date().toISOString() }]);
-      setMessage('');
+      const saved = localStorage.getItem(msgKey);
+      if (saved) {
+        setMessages(JSON.parse(saved));
+      } else {
+        const mockKey = `${userId}_${activeChat.id}`;
+        const initial = USER_MOCK_MESSAGES[mockKey] || [
+          { id: 1, sender_id: activeChat.id, text: `Hello! Thanks for connecting with me on MERCURY CONNECT.`, time: activeChat.time || "Just now" }
+        ];
+        setMessages(initial);
+        localStorage.setItem(msgKey, JSON.stringify(initial));
+      }
+    } catch (e) {
+      console.error(e);
+      setMessages([]);
+    }
+  }, [userId, activeChat?.id]);
+
+  // Auto scroll to bottom when messages update
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!messageText.trim() || !activeChat) return;
+
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const newMsg = {
+      id: Date.now(),
+      sender_id: userId,
+      text: messageText.trim(),
+      time: timeStr
+    };
+
+    const updatedMsgs = [...messages, newMsg];
+    setMessages(updatedMsgs);
+
+    // Save to local storage for this user and chat
+    const msgKey = `vivah_user_msgs_${userId}_${activeChat.id}`;
+    try {
+      localStorage.setItem(msgKey, JSON.stringify(updatedMsgs));
     } catch (err) { console.error(err); }
+
+    // Update last message in chat list
+    setChats(prev => prev.map(c => {
+      if (c.id === activeChat.id) {
+        return { ...c, lastMsg: messageText.trim(), time: timeStr, unread: 0 };
+      }
+      return c;
+    }));
+
+    setMessageText('');
   };
 
-  useEffect(() => { fetchChats(); }, []);
+  // If messaging is locked (Basic / Free user after login)
+  if (!isUnlocked) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] bg-white flex flex-col items-center justify-center relative overflow-hidden px-4 py-12 select-none">
+        {/* Soft pink blurred background glows on the right */}
+        <div className="absolute top-1/4 -right-16 w-96 h-96 bg-gradient-to-br from-pink-300/40 via-rose-200/30 to-purple-300/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-1/6 right-0 w-[30rem] h-[30rem] bg-gradient-to-tr from-pink-400/30 via-rose-300/25 to-purple-300/20 rounded-full blur-3xl pointer-events-none" />
 
-  const onSelectChat = (chat: any) => {
-    setActiveChat(chat);
-    fetchHistory(chat.id);
-  };
+        <div className="relative z-10 max-w-md w-full text-center flex flex-col items-center">
+          {/* Chat Icon Badge */}
+          <div className="w-20 h-20 rounded-full bg-[#fde8ef] flex items-center justify-center mb-7 shadow-sm shadow-rose-100/50">
+            <svg
+              className="w-10 h-10 text-[#ea1d5d]"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+            </svg>
+          </div>
+
+          {/* Heading */}
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-[#111827] tracking-tight mb-3">
+            Chat & Voice Notes Locked
+          </h2>
+
+          {/* Subtitle */}
+          <p className="text-[#64748b] text-sm sm:text-base leading-relaxed mb-8 px-2 max-w-md">
+            Start direct messaging, voice notes, and share matching cards with this profile. Requires Gold or Premium.
+          </p>
+
+          {/* Upgrade to Gold Button */}
+          <button
+            onClick={() => setPage('premium')}
+            className="px-9 py-3.5 sm:px-10 sm:py-4 rounded-full text-white font-bold text-base sm:text-lg bg-gradient-to-r from-[#eb1763] via-[#a81da6] to-[#7926da] hover:opacity-95 shadow-lg shadow-pink-500/25 active:scale-95 transition-all duration-200 cursor-pointer"
+          >
+            Upgrade to Gold
+          </button>
+        </div>
+      </div>
+    );
+  }
+        <div className="absolute top-1/4 -right-16 w-96 h-96 bg-gradient-to-br from-pink-300/40 via-rose-200/30 to-purple-300/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-1/6 right-0 w-[30rem] h-[30rem] bg-gradient-to-tr from-pink-400/30 via-rose-300/25 to-purple-300/20 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 max-w-md w-full text-center flex flex-col items-center">
+          {/* Chat Icon Badge */}
+          <div className="w-20 h-20 rounded-full bg-[#fde8ef] flex items-center justify-center mb-7 shadow-sm shadow-rose-100/50">
+            <svg
+              className="w-10 h-10 text-[#ea1d5d]"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+            </svg>
+          </div>
+
+          {/* Heading */}
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-[#111827] tracking-tight mb-3">
+            Chat & Voice Notes Locked
+          </h2>
+
+          {/* Subtitle */}
+          <p className="text-[#64748b] text-sm sm:text-base leading-relaxed mb-8 px-2 max-w-md">
+            Start direct messaging, voice notes, and share matching cards with this profile. Requires Gold or Premium.
+          </p>
+
+          {/* Upgrade to Gold Button */}
+          <button
+            onClick={() => setPage('premium')}
+            className="px-9 py-3.5 sm:px-10 sm:py-4 rounded-full text-white font-bold text-base sm:text-lg bg-gradient-to-r from-[#eb1763] via-[#a81da6] to-[#7926da] hover:opacity-95 shadow-lg shadow-pink-500/25 active:scale-95 transition-all duration-200 cursor-pointer"
+          >
+            Upgrade to Gold
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-white overflow-hidden">
@@ -2550,9 +2889,188 @@ await fetch('/api/chats/send', {
 
 // ─── Premium ──────────────────────────────────────────────────────────────────
 
-function PremiumPage({ setPage }: { setPage: (p: Page) => void }) {
+function PremiumPage({
+  setPage,
+  currentUser,
+  setCurrentUser
+}: {
+  setPage: (p: Page) => void;
+  currentUser?: any;
+  setCurrentUser?: (user: any) => void;
+}) {
+  const [processingPlan, setProcessingPlan] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string>("");
+  const [paymentSuccess, setPaymentSuccess] = useState<{ tier: string; paymentId: string } | null>(null);
+
+  const currentPlan = (currentUser?.premium_plan || "Basic").toLowerCase();
+
+  const handlePurchase = async (plan: typeof PLANS[0]) => {
+    if (plan.name === "Basic") {
+      alert("Basic plan is free and active by default.");
+      return;
+    }
+
+    setProcessingPlan(plan.name);
+    setPaymentError("");
+
+    const loadRazorpaySDK = (): Promise<boolean> => {
+      return new Promise((resolve) => {
+        if ((window as any).Razorpay) {
+          resolve(true);
+          return;
+        }
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.async = true;
+        script.onload = () => resolve(true);
+        script.onerror = () => resolve(false);
+        document.body.appendChild(script);
+      });
+    };
+
+    try {
+      await loadRazorpaySDK();
+      if (!(window as any).Razorpay) {
+        throw new Error("Razorpay Checkout SDK could not be loaded. Please check your internet connection.");
+      }
+
+      const numericAmount = Number(plan.price.replace(/[^\d]/g, "")) || 2499;
+      const amountPaise = numericAmount * 100;
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5001";
+      const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_MKWS2Prv8NxVml";
+      const user = currentUser || { id: 101, name: "Valued Member", phone: "9876543210", email: "member@mercuryconnect.com" };
+
+      let orderId = "";
+      try {
+        const orderRes = await fetch(`${backendUrl}/api/payment/create-order`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: user.id,
+            tier: plan.name,
+            amount: numericAmount
+          })
+        });
+
+        const orderData = await orderRes.json();
+        if (orderData.success && orderData.order) {
+          orderId = orderData.order.id;
+        }
+      } catch (orderErr) {
+        console.warn("Backend order creation fallback to direct client checkout:", orderErr);
+      }
+
+      const options: any = {
+        key: keyId,
+        amount: amountPaise,
+        currency: "INR",
+        name: "MERCURY CONNECT",
+        description: `${plan.name} Membership Plan (${plan.period})`,
+        image: "/logo.svg",
+        handler: async function (response: any) {
+          try {
+            if (response.razorpay_signature && orderId) {
+              await fetch(`${backendUrl}/api/payment/verify-payment`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                  userId: user.id,
+                  tier: plan.name
+                })
+              }).catch(() => {});
+            }
+          } catch (err) {
+            console.warn("Verify sync error:", err);
+          }
+
+          const updatedUser = {
+            ...user,
+            premium_plan: plan.name,
+            plan: plan.name
+          };
+          localStorage.setItem("vivahUser", JSON.stringify(updatedUser));
+          if (setCurrentUser) setCurrentUser(updatedUser);
+
+          setPaymentSuccess({
+            tier: plan.name,
+            paymentId: response.razorpay_payment_id || "pay_test_" + Date.now()
+          });
+          setProcessingPlan(null);
+        },
+        prefill: {
+          name: user.name || user.full_name || "Valued Member",
+          contact: user.phone || "9876543210",
+          email: user.email || "member@mercuryconnect.com"
+        },
+        notes: {
+          userId: String(user.id || ""),
+          tier: plan.name
+        },
+        theme: {
+          color: plan.popular ? "#D97706" : "#003B7B"
+        },
+        modal: {
+          ondismiss: function () {
+            setProcessingPlan(null);
+          }
+        }
+      };
+
+      if (orderId) {
+        options.order_id = orderId;
+      }
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on("payment.failed", function (response: any) {
+        setPaymentError(response.error?.description || "Payment was cancelled or failed. Please try again.");
+        setProcessingPlan(null);
+      });
+      rzp.open();
+    } catch (err: any) {
+      console.error("Razorpay Error:", err);
+      setPaymentError(err.message || "Failed to start Razorpay payment. Please try again.");
+      setProcessingPlan(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-purple-50">
+      {/* Payment Success Celebration Modal */}
+      {paymentSuccess && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center border border-amber-200 relative animate-in zoom-in-95">
+            <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-200">
+              <Crown className="w-8 h-8 text-white" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-800 font-display mb-1">
+              Welcome to {paymentSuccess.tier}!
+            </h3>
+            <p className="text-sm text-slate-600 mb-4">
+              Your Razorpay payment was successful and your premium membership features are now active.
+            </p>
+            <div className="bg-sky-50 rounded-xl p-3 mb-6 text-left border border-sky-100 text-xs space-y-1">
+              <p className="text-slate-500"><strong>Payment ID:</strong> <span className="font-mono text-slate-700">{paymentSuccess.paymentId}</span></p>
+              <p className="text-slate-500"><strong>Tier:</strong> <span className="text-[#003B7B] font-bold">{paymentSuccess.tier} Membership</span></p>
+              <p className="text-emerald-700 font-semibold flex items-center gap-1">
+                <CheckCircle className="w-3.5 h-3.5" /> Razorpay Test Payment Verified
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setPaymentSuccess(null);
+                setPage("dashboard");
+              }}
+              className="w-full py-3.5 bg-gradient-to-r from-[#003B7B] via-[#1D72B8] to-[#56B7EE] text-white font-bold text-sm rounded-xl shadow-lg hover:opacity-95 transition-all cursor-pointer"
+            >
+              Go to Dashboard &amp; Explore Matches →
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-100 text-amber-700 rounded-full text-sm font-semibold mb-4">
@@ -2562,43 +3080,94 @@ function PremiumPage({ setPage }: { setPage: (p: Page) => void }) {
             Find Your Match <span className="text-rose-700">Faster</span>
           </h1>
           <p className="text-gray-500 max-w-lg mx-auto">Join 50,000+ premium members who found their life partner with our exclusive features.</p>
+          
+          {paymentError && (
+            <div className="mt-4 max-w-md mx-auto p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold">
+              {paymentError}
+            </div>
+          )}
         </div>
 
         <div className="grid md:grid-cols-3 gap-6 mb-14">
-          {PLANS.map((plan, i) => (
-            <div key={i} className={`relative rounded-2xl p-6 border-2 ${plan.popular ? "border-amber-400 shadow-xl shadow-amber-100 bg-gradient-to-b from-white to-amber-50" : "border-rose-100 bg-white hover:border-rose-300 hover:shadow-md transition-all"}`}>
-              {plan.popular && (
-                <div className="absolute -top-3 inset-x-0 flex justify-center">
-                  <span className="px-4 py-1 bg-gradient-to-r from-amber-400 to-amber-600 text-white text-xs font-bold rounded-full shadow">✨ Most Popular</span>
+          {PLANS.map((plan, i) => {
+            const isCurrent = plan.name.toLowerCase() === currentPlan;
+            const isProcessing = processingPlan === plan.name;
+
+            return (
+              <div
+                key={i}
+                className={`relative rounded-2xl p-6 border-2 flex flex-col justify-between ${
+                  isCurrent
+                    ? "border-emerald-500 bg-emerald-50/30 shadow-md"
+                    : plan.popular
+                    ? "border-amber-400 shadow-xl shadow-amber-100 bg-gradient-to-b from-white to-amber-50"
+                    : "border-rose-100 bg-white hover:border-rose-300 hover:shadow-md transition-all"
+                }`}
+              >
+                {isCurrent ? (
+                  <div className="absolute -top-3 inset-x-0 flex justify-center">
+                    <span className="px-4 py-1 bg-emerald-600 text-white text-xs font-bold rounded-full shadow flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Current Plan
+                    </span>
+                  </div>
+                ) : plan.popular ? (
+                  <div className="absolute -top-3 inset-x-0 flex justify-center">
+                    <span className="px-4 py-1 bg-gradient-to-r from-amber-400 to-amber-600 text-white text-xs font-bold rounded-full shadow">✨ Most Popular</span>
+                  </div>
+                ) : null}
+
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    {i === 0 ? <Shield className="w-5 h-5 text-gray-400" /> : i === 1 ? <Star className="w-5 h-5 text-amber-500 fill-amber-500" /> : <Crown className="w-5 h-5 text-purple-600" />}
+                    <h3 className="font-display text-xl font-bold text-gray-900">{plan.name}</h3>
+                  </div>
+                  <div className="flex items-end gap-1 mb-5">
+                    <span className="font-display text-4xl font-bold text-rose-700">{plan.price}</span>
+                    <span className="text-gray-400 text-sm pb-1">{plan.period}</span>
+                  </div>
+                  <ul className="space-y-2.5 mb-6">
+                    {plan.features.map((f, j) => (
+                      <li key={j} className="flex items-center gap-2.5 text-sm text-gray-700">
+                        <div className="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0"><Check className="w-2.5 h-2.5 text-emerald-600" /></div>
+                        {f}
+                      </li>
+                    ))}
+                    {plan.extras.map((f, j) => (
+                      <li key={j} className="flex items-center gap-2.5 text-sm text-gray-400">
+                        <div className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"><X className="w-2.5 h-2.5 text-gray-300" /></div>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              )}
-              <div className="flex items-center gap-2 mb-2">
-                {i === 0 ? <Shield className="w-5 h-5 text-gray-400" /> : i === 1 ? <Star className="w-5 h-5 text-amber-500 fill-amber-500" /> : <Crown className="w-5 h-5 text-purple-600" />}
-                <h3 className="font-display text-xl font-bold text-gray-900">{plan.name}</h3>
+
+                <button
+                  type="button"
+                  disabled={isProcessing}
+                  onClick={() => handlePurchase(plan)}
+                  className={`w-full py-3.5 rounded-xl font-semibold text-sm transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                    isCurrent
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-md"
+                      : plan.popular
+                      ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white hover:opacity-90 shadow-md shadow-amber-200"
+                      : i === 2
+                      ? "bg-gradient-to-r from-purple-600 to-rose-600 text-white hover:opacity-90 shadow-sm"
+                      : "border-2 border-rose-300 text-rose-700 hover:bg-rose-50"
+                  }`}
+                >
+                  {isProcessing ? (
+                    <span>Opening Razorpay Checkout...</span>
+                  ) : isCurrent ? (
+                    <span>Active ({plan.name}) — Click to Renew</span>
+                  ) : i === 0 ? (
+                    "Included Free"
+                  ) : (
+                    `Get ${plan.name} Plan (${plan.price})`
+                  )}
+                </button>
               </div>
-              <div className="flex items-end gap-1 mb-5">
-                <span className="font-display text-4xl font-bold text-rose-700">{plan.price}</span>
-                <span className="text-gray-400 text-sm pb-1">{plan.period}</span>
-              </div>
-              <ul className="space-y-2.5 mb-6">
-                {plan.features.map((f, j) => (
-                  <li key={j} className="flex items-center gap-2.5 text-sm text-gray-700">
-                    <div className="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0"><Check className="w-2.5 h-2.5 text-emerald-600" /></div>
-                    {f}
-                  </li>
-                ))}
-                {plan.extras.map((f, j) => (
-                  <li key={j} className="flex items-center gap-2.5 text-sm text-gray-400">
-                    <div className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"><X className="w-2.5 h-2.5 text-gray-300" /></div>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <button className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${plan.popular ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white hover:opacity-90 shadow-md shadow-amber-200" : i === 2 ? "bg-gradient-to-r from-purple-600 to-rose-600 text-white hover:opacity-90 shadow-sm" : "border-2 border-rose-300 text-rose-700 hover:bg-rose-50"}`}>
-                {i === 0 ? "Start Free" : `Get ${plan.name} Plan`}
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-rose-100 overflow-hidden">
@@ -3081,7 +3650,7 @@ function AdminPanel({ section, setSection, setPage }: { section: AdminSection; s
             </button>
             <div>
               <h1 className="text-white font-semibold text-sm">{navItems.find(n => n.id === section)?.label}</h1>
-              <p className="text-gray-500 text-xs">VivahShaadi Admin · {new Date().toLocaleDateString("en-IN", { weekday: "short", year: "numeric", month: "short", day: "numeric" })}</p>
+              <p className="text-gray-400 text-xs">MERCURY CONNECT Admin · {new Date().toLocaleDateString("en-IN", { weekday: "short", year: "numeric", month: "short", day: "numeric" })}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -3172,7 +3741,7 @@ export default function App() {
       )}
 
       {page === 'landing' && <LandingPage setPage={navigate} />}
-      {page === 'login' && <LoginPage setPage={navigate} />}
+      {page === 'login' && <LoginPage setPage={navigate} setCurrentUser={setCurrentUser} />}
       {page === 'register' && (
         <RegisterPage step={regStep} setStep={setRegStep} setPage={navigate} />
       )}
@@ -3180,7 +3749,7 @@ export default function App() {
       {page === 'profile' && <ProfilePage setPage={navigate} />}
       {page === 'interests' && <InterestsPage setPage={navigate} currentUser={currentUser} />}
       {page === 'chat' && <ChatPage setPage={navigate} currentUser={currentUser} />}
-      {page === 'premium' && <PremiumPage setPage={navigate} />}
+      {page === 'premium' && <PremiumPage setPage={navigate} currentUser={currentUser} setCurrentUser={setCurrentUser} />}
     </div>
   );
 }

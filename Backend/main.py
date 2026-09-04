@@ -19,6 +19,7 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
+import base64
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -43,6 +44,67 @@ try:
     HAS_CV2 = True
 except Exception:
     HAS_CV2 = False
+
+def extract_photo_from_image(filepath, bounding_box=None):
+    """Detects face or portrait photo in document and crops it as a high quality base64 Data URL."""
+    if not HAS_CV2:
+        return None
+    try:
+        img = cv2.imread(filepath)
+        if img is None:
+            return None
+        h, w = img.shape[:2]
+
+        # 1. If normalized bounding box provided [ymin, xmin, ymax, xmax] (0-1000 scale or 0-1 scale)
+        if bounding_box and isinstance(bounding_box, (list, tuple)) and len(bounding_box) == 4:
+            ymin, xmin, ymax, xmax = [float(v) for v in bounding_box]
+            if max(ymin, xmin, ymax, xmax) > 1.5:  # 0-1000 scale
+                ymin, xmin, ymax, xmax = ymin / 1000.0, xmin / 1000.0, ymax / 1000.0, xmax / 1000.0
+            
+            y1 = max(0, int(ymin * h))
+            x1 = max(0, int(xmin * w))
+            y2 = min(h, int(ymax * h))
+            x2 = min(w, int(xmax * w))
+
+            if (x2 - x1) > 20 and (y2 - y1) > 20:
+                cropped = img[y1:y2, x1:x2]
+                if cropped.size > 0:
+                    cropped_resized = cv2.resize(cropped, (350, 350), interpolation=cv2.INTER_AREA)
+                    _, buffer = cv2.imencode('.jpg', cropped_resized, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+                    b64 = base64.b64encode(buffer).decode('utf-8')
+                    return f"data:image/jpeg;base64,{b64}"
+
+        # 2. Try OpenCV Haar Cascade Face Detection
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        if os.path.exists(cascade_path):
+            face_cascade = cv2.CascadeClassifier(cascade_path)
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(50, 50))
+            if len(faces) > 0:
+                # Pick largest face
+                best_face = max(faces, key=lambda f: f[2] * f[3])
+                fx, fy, fw, fh = best_face
+                
+                # Portrait padding
+                pad_top = int(fh * 0.45)
+                pad_bottom = int(fh * 0.45)
+                pad_left = int(fw * 0.35)
+                pad_right = int(fw * 0.35)
+                
+                x1 = max(0, fx - pad_left)
+                y1 = max(0, fy - pad_top)
+                x2 = min(w, fx + fw + pad_right)
+                y2 = min(h, fy + fh + pad_bottom)
+                
+                cropped = img[y1:y2, x1:x2]
+                if cropped.size > 0:
+                    cropped_resized = cv2.resize(cropped, (350, 350), interpolation=cv2.INTER_AREA)
+                    _, buffer = cv2.imencode('.jpg', cropped_resized, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+                    b64 = base64.b64encode(buffer).decode('utf-8')
+                    return f"data:image/jpeg;base64,{b64}"
+    except Exception as e:
+        print("Face photo extraction error:", e)
+    return None
 
 def preprocess_image_variants(filepath):
     """Returns list of image filepaths (original, enhanced, thresholded) to maximize OCR extraction."""
@@ -107,24 +169,34 @@ NAKSHATRA_MAP = {
 }
 
 LABEL_MAP = {
-    "name": "name", "full name": "name", "பெயர்": "name",
-    "dob": "dob", "date of birth": "dob", "பிறந்த தேதி": "dob",
+    "name": "name", "full name": "name", "candidate name": "name", "groom name": "name", "bride name": "name", "பெயர்": "name", "மணமகன் பெயர்": "name", "மணமகள் பெயர்": "name",
+    "gender": "gender", "sex": "gender", "பாலினம்": "gender",
+    "dob": "dob", "date of birth": "dob", "birth date": "dob", "பிறந்த தேதி": "dob",
     "birth time": "birth_time", "time of birth": "birth_time", "பிறந்த நேரம்": "birth_time",
-    "birth place": "birth_place", "place of birth": "birth_place", "பிறந்த இடம்": "birth_place", "பிறப்பிடம்": "birth_place",
-    "star": "nakshatra", "nakshatra": "nakshatra", "நட்சத்திரம்": "nakshatra",
-    "rasi": "rasi", "raasi": "rasi", "ராசி": "rasi",
+    "birth place": "birth_place", "place of birth": "birth_place", "பிறந்த இடம்": "birth_place", "பிறப்பிடம்": "birth_place", "பிறந்த ஊர்": "birth_place", "ஊர்": "birth_place",
+    "star": "nakshatra", "nakshatra": "nakshatra", "நட்சத்திரம்": "nakshatra", "நக்ஷத்திரம்": "nakshatra",
+    "rasi": "rasi", "raasi": "rasi", "ராசி": "rasi", "இராசி": "rasi",
     "height": "height", "உயரம்": "height",
     "weight": "weight", "எடை": "weight",
-    "complexion": "complexion", "நிறம்": "complexion",
+    "complexion": "complexion", "நிறம்": "complexion", "skin": "complexion",
     "religion": "religion", "மதம்": "religion",
-    "caste": "caste", "ஜாதி": "caste", "சாதி": "caste",
-    "education": "education", "கல்வி": "education", "படிப்பு": "education",
-    "occupation": "occupation", "job": "occupation", "தொழில்": "occupation", "வேலை": "occupation",
-    "income": "annual_income", "annual income": "annual_income", "வருமானம்": "annual_income", "மாத வருமானம்": "annual_income",
-    "father name": "father_name", "father's name": "father_name", "தந்தை": "father_name", "தந்தை பெயர்": "father_name",
-    "mother name": "mother_name", "mother's name": "mother_name", "தாயார்": "mother_name", "தாயார் பெயர்": "mother_name",
-    "phone": "phone", "mobile": "phone", "contact": "phone", "தொலைபேசி": "phone", "மொபைல்": "phone", "அலைபேசி": "phone",
-    "address": "address", "முகவரி": "address"
+    "caste": "caste", "ஜாதி": "caste", "சாதி": "caste", "சமூகம்": "caste",
+    "sub caste": "sub_caste", "subcaste": "sub_caste", "உட்பிரிவு": "sub_caste", "குலம்": "sub_caste", "குலம்/கோத்ரம்/வீடு": "sub_caste",
+    "gotra": "gotra", "gothram": "gotra", "கோத்ரம்": "gotra", "கோத்திரம்": "gotra",
+    "education": "education", "கல்வி": "education", "படிப்பு": "education", "கல்வித்தகுதி": "education",
+    "occupation": "occupation", "job": "occupation", "தொழில்": "occupation", "வேலை": "occupation", "பணி": "occupation", "பணி விவரங்கள்": "occupation", "பணி விபரம்": "occupation",
+    "income": "annual_income", "annual income": "annual_income", "salary": "annual_income", "வருமானம்": "annual_income", "மாத வருமானம்": "annual_income",
+    "father name": "father_name", "father's name": "father_name", "தந்தை": "father_name", "தந்தை பெயர்": "father_name", "அப்பா பெயர்": "father_name",
+    "father job": "father_job", "father occupation": "father_job", "தந்தை பணி": "father_job", "தந்தை பணி விபரம்": "father_job", "தந்தை தொழில்": "father_job",
+    "mother name": "mother_name", "mother's name": "mother_name", "தாயார்": "mother_name", "தாயார் பெயர்": "mother_name", "தாய் பெயர்": "mother_name", "அம்மா பெயர்": "mother_name",
+    "mother job": "mother_job", "mother occupation": "mother_job", "தாய் பணி": "mother_job", "தாய் பணி விபரம்": "mother_job", "தாயார் பணி": "mother_job", "தாயார் தொழில்": "mother_job",
+    "siblings": "siblings", "உடன் பிறந்தவர்கள்": "siblings", "உடன்பிறப்பு": "siblings",
+    "brother": "brother", "சகோதரர்": "brother", "சகோதரர்கள்": "brother",
+    "sister": "sister", "சகோதரி": "sister", "சகோதரிகள்": "sister",
+    "phone": "phone", "mobile": "phone", "contact": "phone", "தொலைபேசி": "phone", "மொபைல்": "phone", "அலைபேசி": "phone", "தொலைப்பேசி": "phone", "தொலைபேசி எண்": "phone", "தொலைப்பேசி எண்": "phone", "தொடர்பு": "phone",
+    "whatsapp": "whatsapp", "வாட்ஸ்ஆப்": "whatsapp", "வாட்ஸ்அப்": "whatsapp", "வாட்ஸ்ஆப் எண்": "whatsapp", "வாட்ஸ்அப் எண்": "whatsapp",
+    "address": "address", "முகவரி": "address", "வசிப்பிடம்": "address", "இருப்பிடம்": "city",
+    "property": "property_details", "சொத்து": "property_details", "சொத்து விபரம்": "property_details", "சொத்து விவரம்": "property_details"
 }
 
 # =========================
@@ -263,6 +335,14 @@ TAMIL_ENGLISH_MAP = {
     "தொழிலதிபர்": "Businessman",
     "இல்லத்தரசி": "Homemaker",
     "விவசாயி": "Farmer",
+    "விவசாயம்": "Farmer",
+    "வியாபாரம்": "Business",
+    "வணிகம்": "Business",
+    "பெண்": "Female",
+    "ஆண்": "Male",
+    "மாப்பிள்ளை": "Groom",
+    "மணமகன்": "Groom",
+    "மணமகள்": "Bride",
     "திருமணமானவர்": "Married",
     "திருமணம் ஆகாதவர்": "Unmarried / Single",
     "திரு.": "Mr.",
@@ -271,7 +351,11 @@ TAMIL_ENGLISH_MAP = {
     "செல்வி": "Ms.",
     "காலை": "Morning",
     "மாலை": "Evening",
-    "இரவு": "Night"
+    "இரவு": "Night",
+    "மிருகசீரிடம்": "Mrigashirsha",
+    "மிருகசீரிஷம்": "Mrigashirsha",
+    "அசுவினி": "Ashwini",
+    "அஸ்வினி": "Ashwini"
 }
 
 def translate_to_english(text_str: str) -> str:
@@ -503,39 +587,43 @@ def fallback_extract(text):
     lines = [line.strip() for line in text.splitlines() if line.strip()]
 
     FIELD_PATTERNS = {
-        "father_name": [r"father'?s?\s*name", r"father\s*name", r"father", r"தந்தை\s*பெயர்", r"தந்தை", r"அப்பா\s*பெயர்"],
-        "father_job": [r"father'?s?\s*occupation", r"father\s*job", r"father\s*occupation", r"தந்தை\s*தொழில்", r"தந்தை\s*பணி"],
-        "mother_name": [r"mother'?s?\s*name", r"mother\s*name", r"mother", r"தாயார்\s*பெயர்", r"தாயார்", r"அம்மா\s*பெயர்"],
-        "mother_job": [r"mother'?s?\s*occupation", r"mother\s*job", r"mother\s*occupation", r"தாயார்\s*தொழில்", r"தாயார்\s*பணி"],
-        "brother": [r"brother'?s?\s*name", r"brother", r"சகோதரர்"],
-        "sister": [r"sister'?s?\s*name", r"sister", r"சகோதரி"],
-        "sub_caste": [r"sub\s*caste", r"subcaste", r"உட்பிரிவு"],
+        "gender": [r"gender", r"sex", r"பாலினம்"],
+        "father_job": [r"father'?s?\s*(?:occupation|job|work|profession)", r"father\s*(?:occupation|job|work|profession)", r"தந்தை\s*பணி\s*விபரம்", r"தந்தை\s*பணி", r"தந்தை\s*தொழில்"],
+        "father_name": [r"father'?s?\s*name", r"father\s*name", r"^father$", r"^father's$", r"தந்தை\s*பெயர்", r"^தந்தை$", r"அப்பா\s*பெயர்"],
+        "mother_job": [r"mother'?s?\s*(?:occupation|job|work|profession)", r"mother\s*(?:occupation|job|work|profession)", r"தாய்\s*பணி\s*விபரம்", r"தாயார்\s*பணி\s*விபரம்", r"தாயார்\s*தொழில்", r"தாய்\s*தொழில்", r"தாயார்\s*பணி", r"தாய்\s*பணி"],
+        "mother_name": [r"mother'?s?\s*name", r"mother\s*name", r"^mother$", r"^mother's$", r"தாயார்\s*பெயர்", r"^தாயார்$", r"தாய்\s*பெயர்", r"அம்மா\s*பெயர்"],
+        "siblings": [r"siblings", r"brothers?\s*(?:and|&)\s*sisters?", r"உடன்\s*பிறந்தவர்கள்", r"உடன்பிறப்பு"],
+        "brother": [r"brother'?s?\s*names?", r"brother\s*names?", r"brother's", r"சகோதரர்\s*பெயர்", r"சகோதரர்"],
+        "sister": [r"sister'?s?\s*names?", r"sister\s*names?", r"sister's", r"சகோதரி\s*பெயர்", r"சகோதரி"],
+        "sub_caste": [r"sub\s*caste", r"subcaste", r"குலம்\s*/\s*கோத்ரம்\s*/\s*வீடு", r"குலம்/கோத்ரம்/வீடு", r"குலம்", r"வீடு", r"உட்பிரிவு"],
+        "gotra": [r"gotra", r"gotram", r"கோத்ரம்", r"கோத்திரம்"],
         "birth_time": [r"birth\s*time", r"time\s*of\s*birth", r"birthtime", r"பிறந்த\s*நேரம்", r"ஜனன\s*நேரம்", r"ஜனன\s*காலம்"],
-        "birth_place": [r"place\s*of\s*birth", r"birth\s*place", r"birthplace", r"பிறந்த\s*இடம்", r"பிறப்பிடம்"],
+        "birth_place": [r"place\s*of\s*birth", r"birth\s*place", r"birthplace", r"பிறந்த\s*ஊர்", r"பிறந்த\s*இடம்", r"பிறப்பிடம்"],
         "dob": [r"date\s*of\s*birth", r"oate\s*of\s*birth", r"dob", r"birth\s*date", r"பிறந்த\s*தேதி", r"தேதி"],
-        "name": [r"candidate\s*name", r"groom\s*name", r"bride\s*name", r"full\s*name", r"name", r"பெயர்"],
+        "name": [r"candidate\s*name", r"groom\s*name", r"bride\s*name", r"full\s*name", r"name", r"பெயர்", r"மணமகன்\s*பெயர்", r"மணமகள்\s*பெயர்"],
         "rasi": [r"rashi", r"rasi", r"raasi", r"இராசி", r"ராசி"],
         "nakshatra": [r"nakshatram", r"nakshatra", r"nekshatre", r"star", r"நட்சத்திரம்", r"நக்ஷத்திரம்"],
         "lagnam": [r"lagnam", r"lagna", r"லக்னம்"],
         "manglik_status": [r"manglik\s*status", r"manglik", r"தோஷம்", r"செவ்வாய்\s*தோஷம்"],
         "religion": [r"religion", r"rutigion", r"மதம்"],
-        "caste": [r"caste", r"சாதி", r"ஜாதி", r"குலம்"],
+        "caste": [r"caste", r"சாதி", r"ஜாதி"],
         "mother_tongue": [r"mother\s*tongue", r"mothertongue", r"தாய்மொழி"],
-        "gotra": [r"gotra", r"gotram", r"கோத்திரம்"],
         "family_type": [r"family\s*type", r"குடும்ப\s*வகை"],
-        "complexion": [r"complexion", r"நிறம்"],
+        "complexion": [r"complexion", r"skin", r"நிறம்"],
         "blood_group": [r"blood\s*group", r"blood", r"இரத்த\s*வகை", r"ரத்த\s*வகை"],
         "height": [r"height", r"உயரம்"],
         "weight": [r"weight", r"எடை"],
         "education": [r"education", r"qualification", r"degree", r"கல்வித்\s*தகுதி", r"கல்வித்தகுதி", r"கல்வி", r"படிப்பு"],
-        "occupation": [r"occupation", r"job", r"profession", r"work", r"பணி", r"தொழில்", r"வேலை"],
-        "annual_income": [r"annual\s*income", r"income", r"salary", r"மாத\s*வருமானம்", r"வருமானம்", r"சம்பளம்"],
+        "occupation": [r"occupation", r"job", r"profession", r"work", r"பணி\s*விவரங்கள்", r"பணி\s*விபரம்", r"பணி", r"தொழில்", r"வேலை"],
+        "annual_income": [r"annual\s*income", r"income", r"salary", r"monthly\s*income", r"மாத\s*வருமானம்", r"வருமானம்", r"சம்பளம்"],
         "email": [r"email\s*id", r"email", r"மின்னஞ்சல்"],
-        "phone": [r"phone\s*no\.?", r"phone", r"mobile", r"contact", r"அலைபேசி\s*எண்கள்", r"அலைபேசி", r"தொலைபேசி", r"தொடர்பு"],
-        "address": [r"residential\s*address", r"address", r"முகவரி"],
-        "city": [r"city", r"town", r"மாவட்டம்", r"ஊர்"],
+        "phone": [r"phone\s*no\.?", r"phone", r"mobile", r"contact", r"தொலைப்பேசி\s*எண்", r"தொலைபேசி\s*எண்", r"தொலைப்பேசி", r"தொலைபேசி", r"அலைபேசி\s*எண்கள்", r"அலைபேசி", r"தொடர்பு"],
+        "whatsapp": [r"whatsapp\s*no\.?", r"whatsapp", r"வாட்ஸ்ஆப்\s*எண்", r"வாட்ஸ்அப்\s*எண்", r"வாட்ஸ்ஆப்", r"வாட்ஸ்அப்"],
+        "address": [r"residential\s*address", r"address", r"முகவரி", r"வசிப்பிடம்"],
+        "city": [r"city", r"town", r"மாவட்டம்", r"ஊர்", r"இருப்பிடம்"],
         "state": [r"state", r"மாநிலம்"],
-        "country": [r"country", r"தேசம்", r"நாடு"]
+        "country": [r"country", r"தேசம்", r"நாடு"],
+        "property_details": [r"property", r"asset", r"சொத்து\s*விபரம்", r"சொத்து\s*விவரம்", r"சொத்து"]
     }
 
     # Line-by-line Key-Value parsing
@@ -590,13 +678,28 @@ def fallback_extract(text):
     return fields
 
 
+def is_count_or_invalid_py(val):
+    if not val:
+        return True
+    s = str(val).strip().lower()
+    if not s or s in ["nil", "none", "no", "n/a", "na", "-", "0", "not provided", "null", "undefined", "bip", "dusky", "bip dusky", "fair", "wheatish", "female", "male"]:
+        return True
+    if s.isdigit():
+        return True
+    if re.match(r"^[\d\s,.\-()/]+(?:brother|sister|brothers|sisters|elder|younger|married|unmarried|nos?)*$", s, re.IGNORECASE):
+        return True
+    return False
+
+
 def normalize_and_alias_fields(fields: dict) -> dict:
     alias_map = {
         "name": ["name", "fullName", "full_name"],
+        "gender": ["gender", "sex"],
         "dob": ["dob", "dateOfBirth", "date_of_birth"],
         "birth_time": ["birth_time", "birthTime"],
         "birth_place": ["birth_place", "birthPlace"],
         "phone": ["phone", "contactPhone", "mobile", "phone_no"],
+        "whatsapp": ["whatsapp", "whatsApp", "whatsappPhone", "whatsappNumber"],
         "email": ["email"],
         "rasi": ["rasi", "raasi"],
         "nakshatra": ["nakshatra", "star"],
@@ -618,12 +721,14 @@ def normalize_and_alias_fields(fields: dict) -> dict:
         "father_job": ["father_job", "fatherJob", "fathersJob"],
         "mother_name": ["mother_name", "motherName", "mothersName"],
         "mother_job": ["mother_job", "motherJob", "mothersJob"],
+        "siblings": ["siblings"],
         "brother": ["brother", "brotherName", "brothersName"],
         "sister": ["sister", "sisterName", "sistersName"],
         "city": ["city"],
         "state": ["state"],
         "country": ["country"],
-        "address": ["address", "residentialAddress"]
+        "address": ["address", "residentialAddress"],
+        "property_details": ["property_details", "propertyDetails", "property"]
     }
 
     result = {}
@@ -631,11 +736,16 @@ def normalize_and_alias_fields(fields: dict) -> dict:
         if v and str(v).strip():
             result[k] = str(v).strip()
 
+    # Sanitize invalid name fields
+    for name_key in ["name", "fullName", "full_name", "father_name", "mother_name", "brother", "sister", "brotherName", "sisterName", "fatherName", "motherName"]:
+        if name_key in result and is_count_or_invalid_py(result[name_key]):
+            result[name_key] = ""
+
     for canonical_key, aliases in alias_map.items():
         val = ""
         for alias in aliases:
-            if alias in fields and fields[alias] and str(fields[alias]).strip():
-                val = str(fields[alias]).strip()
+            if alias in result and result[alias] and str(result[alias]).strip():
+                val = str(result[alias]).strip()
                 break
         if val:
             for alias in aliases:
@@ -714,8 +824,8 @@ async def extract_text(file: UploadFile = File(...)):
 
     try:
         api_key = os.getenv("GEMINI_API_KEY", "")
-        if not api_key or not api_key.startswith("AIzaSy"):
-            gemini_error_msg = "GEMINI_API_KEY in Backend-local/.env is invalid or missing. Please add a valid API Key from https://aistudio.google.com to enable 100% accurate AI vision OCR on blurry/handwritten images."
+        if not api_key or len(api_key.strip()) < 10:
+            gemini_error_msg = "GEMINI_API_KEY in .env is invalid or missing. Please add a valid API Key from https://aistudio.google.com to enable 100% accurate AI vision OCR on blurry/handwritten images."
             print(f"[OCR NOTICE] {gemini_error_msg}")
 
         with open(filepath, "rb") as f:
@@ -735,34 +845,45 @@ async def extract_text(file: UploadFile = File(...)):
         OCR Hint Text:
         {full_text}
 
-        Perform 2 tasks:
+        Perform 3 tasks:
         1. "extracted_text": Extract all readable text from the document clearly line by line in original language (Tamil/English).
-        2. "fields": Extract key biodata details into JSON format matching these exact keys (use empty string "" if not found):
-           - name (string)
-           - dob (string, Date of birth)
-           - birthTime (string)
-           - birthPlace (string)
-           - religion (string, e.g. Hindu / இந்து)
-           - caste (string)
-           - subCaste (string)
-           - motherTongue (string)
-           - bloodGroup (string, e.g. O+)
-           - height (string)
-           - weight (string)
-           - education (string)
-           - occupation (string)
-           - income (string)
-           - fatherName (string)
-           - motherName (string)
-           - phone (string)
-           - city (string)
-           - state (string)
-           - country (string)
-           - rasi (string)
-           - nakshatra (string)
-           - address (string)
+        2. "hasPhoto": Check if this document contains an actual photograph/portrait of the person. Return boolean true or false.
+        3. "photoBoundingBox": If hasPhoto is true, provide normalized coordinates [ymin, xmin, ymax, xmax] (0 to 1000 scale) for the photo/face area. If no photo, provide [].
+        4. "fields": Extract key biodata details into JSON format matching these exact keys (translate Tamil terms to English, use empty string "" if not found):
+           - name (string, person's actual name, e.g. "palavi")
+           - gender (string, "Male" or "Female")
+           - dob (string, Date of birth in DD-MM-YYYY format, e.g. "12-12-2000")
+           - birthTime (string, e.g. "08:05 AM")
+           - birthPlace (string, e.g. "Erode, Tamil Nadu, IN")
+           - religion (string, e.g. "Hindu")
+           - caste (string, e.g. "joc")
+           - subCaste (string, e.g. "kannan")
+           - gotra (string)
+           - motherTongue (string, e.g. "Tamil")
+           - complexion (string, e.g. "Dusky", "Fair", "Wheatish")
+           - bloodGroup (string, e.g. "O+")
+           - height (string, e.g. "114 cm" or "5'4\"")
+           - weight (string, e.g. "56 kg")
+           - education (string, e.g. "Be")
+           - occupation (string, e.g. "Business")
+           - income (string, e.g. "545454")
+           - fatherName (string, e.g. "ravi")
+           - fatherJob (string, e.g. "farmer")
+           - motherName (string, e.g. "latha")
+           - motherJob (string, e.g. "home maker")
+           - siblings (string, e.g. "Elder Sister-2, Elder Brother-1")
+           - phone (string, 10 numeric digits, e.g. "1478523690")
+           - whatsapp (string, 10 numeric digits, e.g. "1234567890")
+           - city (string, e.g. "coimbatore")
+           - state (string, e.g. "Tamil Nadu")
+           - country (string, e.g. "India" or "IN")
+           - rasi (string, e.g. "Mithunam")
+           - nakshatra (string, e.g. "Mrigashirsha")
+           - dosham (string, e.g. "Rahu Ketu Dosham" or "None")
+           - address (string, e.g. "coimbatore")
+           - propertyDetails (string, e.g. "20 Billion")
 
-        Return ONLY a JSON object with keys "extracted_text" and "fields". Do not include markdown code block formatting (no ```json).
+        Return ONLY a JSON object with keys "extracted_text", "hasPhoto", "photoBoundingBox", and "fields". Do not include markdown code block formatting (no ```json).
         """
 
         image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
@@ -773,17 +894,31 @@ async def extract_text(file: UploadFile = File(...)):
                 m_name = getattr(m, "name", "")
                 supported_methods = getattr(m, "supported_generation_methods", [])
                 if m_name and "gemini" in m_name.lower() and ("generateContent" in supported_methods or not supported_methods):
+                    lower_name = m_name.lower()
+                    if any(bad in lower_name for bad in ["-tts", "embed", "aqa", "imagen", "bison"]):
+                        continue
                     available_models.append(m_name)
         except Exception as l_err:
             print("Error listing models from API:", l_err)
 
-        model_candidates = available_models if available_models else [
-            "gemini-2.5-flash",
+        preferred_models = [
+            "gemini-3.6-flash",
+            "models/gemini-3.6-flash",
             "gemini-2.0-flash",
             "models/gemini-2.0-flash",
             "gemini-1.5-flash",
-            "models/gemini-1.5-flash"
+            "models/gemini-1.5-flash",
+            "gemini-3.1-pro-preview",
+            "models/gemini-3.1-pro-preview",
+            "gemini-2.5-flash",
+            "gemini-1.5-pro",
+            "models/gemini-1.5-pro"
         ]
+
+        # Prioritize preferred working models
+        model_candidates = [m for m in preferred_models if m in available_models] + [m for m in available_models if m not in preferred_models]
+        if not model_candidates:
+            model_candidates = preferred_models
 
         response = None
         for model_name in model_candidates:
@@ -800,6 +935,9 @@ async def extract_text(file: UploadFile = File(...)):
                 gemini_error_msg = str(g_err)
                 print(f"Gemini model {model_name} error: {g_err}")
 
+        ai_has_photo = False
+        ai_bbox = []
+
         if response and response.text:
             raw_output = response.text.strip()
             if raw_output.startswith("```"):
@@ -814,11 +952,22 @@ async def extract_text(file: UploadFile = File(...)):
                 if "fields" in parsed and isinstance(parsed["fields"], dict):
                     ai_fields = parsed["fields"]
                     ai_extracted_text = parsed.get("extracted_text", "")
+                    ai_has_photo = bool(parsed.get("hasPhoto", False))
+                    ai_bbox = parsed.get("photoBoundingBox", [])
                 else:
                     ai_fields = parsed
 
     except Exception as e:
         print("Gemini extraction error:", e)
+
+    # Crop/extract face photo if present
+    extracted_photo = None
+    try:
+        extracted_photo = extract_photo_from_image(filepath, bounding_box=ai_bbox if ai_has_photo else None)
+    except Exception as crop_err:
+        print("Face crop error:", crop_err)
+
+    has_photo = bool(extracted_photo or ai_has_photo)
 
     # Replace fragmented or empty OCR text with Gemini Vision's clean extracted text if available
     if ai_extracted_text and (not full_text or is_fragmented or len(full_text.strip()) < 10):
@@ -851,12 +1000,22 @@ async def extract_text(file: UploadFile = File(...)):
         else:
             english_fields[k] = ""
 
-    res = {"success": True, "text": full_text, "fields": english_fields}
+    if extracted_photo:
+        english_fields["photo"] = extracted_photo
+        english_fields["img"] = extracted_photo
+
+    res = {
+        "success": True, 
+        "text": full_text, 
+        "fields": english_fields,
+        "hasPhoto": has_photo,
+        "photo": extracted_photo or ""
+    }
     if gemini_error_msg:
         res["note"] = gemini_error_msg
 
     try:
-        print("========== OCR FINAL EXTRACTED FIELDS ==========")
+        print(f"========== OCR FINAL EXTRACTED FIELDS (hasPhoto={has_photo}) ==========")
         print(json.dumps(final_fields, ensure_ascii=False, indent=2))
         print("================================================")
     except Exception:

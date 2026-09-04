@@ -1,6 +1,7 @@
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ path: '.env.local' });
+dotenv.config({ path: '.env' });
 
 const dbConfig = {
   // Use 127.0.0.1 explicitly — 'localhost' resolves to IPv6 (::1) on Windows,
@@ -83,7 +84,10 @@ async function createTables() {
       dosham VARCHAR(100),
       horoscope_path VARCHAR(255),
       horoscope_status VARCHAR(20) DEFAULT 'approved', -- 'pending', 'approved', 'rejected'
-      img VARCHAR(255),
+      img LONGTEXT,
+      horoscope_match INT DEFAULT NULL,
+      latitude DOUBLE NULL,
+      longitude DOUBLE NULL,
       premium_plan VARCHAR(20) DEFAULT 'Basic', -- 'Basic', 'Gold', 'Premium'
       views_used INT DEFAULT 0,
       interests_used INT DEFAULT 0,
@@ -93,6 +97,27 @@ async function createTables() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  try {
+    await pool.query(`ALTER TABLE users MODIFY COLUMN img LONGTEXT`);
+  } catch (_) {}
+
+  // Safely add optional/migration columns to users table if they don't already exist
+  const addColumnSafely = async (columnDef) => {
+    try {
+      await pool.query(`ALTER TABLE users ADD COLUMN ${columnDef}`);
+    } catch (err) {
+      // Ignore error if column already exists (ER_DUP_FIELDNAME / errno 1060)
+    }
+  };
+
+  await addColumnSafely(`horoscope_match INT DEFAULT NULL`);
+  await addColumnSafely(`latitude DOUBLE NULL`);
+  await addColumnSafely(`longitude DOUBLE NULL`);
+  await addColumnSafely(`whatsapp_verified TINYINT DEFAULT 0`);
+  await addColumnSafely(`aadhar_verified TINYINT DEFAULT 0`);
+  await addColumnSafely(`aadhar_number VARCHAR(20) DEFAULT NULL`);
+  await addColumnSafely(`profile_completion INT DEFAULT 65`);
 
   // Interests Table
   await pool.query(`
@@ -146,6 +171,65 @@ async function createTables() {
       FOREIGN KEY (reported_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE
     )
+  `);
+
+  // Plans Table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS plans (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      plan_name VARCHAR(50) NOT NULL UNIQUE,
+      price DECIMAL(10, 2) NOT NULL,
+      period VARCHAR(50) DEFAULT '3 Months',
+      daily_profile_views INT DEFAULT 50,
+      interest_requests INT DEFAULT 10,
+      verified_matches TINYINT DEFAULT 0,
+      direct_messaging TINYINT DEFAULT 0,
+      priority_support TINYINT DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  `);
+
+  await pool.query(`
+    INSERT INTO plans (plan_name, price, period, daily_profile_views, interest_requests, verified_matches, direct_messaging, priority_support)
+    VALUES
+      ('Basic', 0.00, 'Free Forever', 50, 10, 0, 0, 0),
+      ('Gold', 2499.00, '3 Months', 250, 50, 1, 1, 0),
+      ('Premium', 4999.00, '6 Months', 999999, 999999, 1, 1, 1)
+    ON DUPLICATE KEY UPDATE price=VALUES(price), period=VALUES(period);
+  `);
+
+  // User Plans Table (Track active user plan & history)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_plans (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      plan_id INT NOT NULL,
+      plan_name VARCHAR(50) NOT NULL,
+      amount_paid DECIMAL(10, 2) DEFAULT 0.00,
+      start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      expiry_date TIMESTAMP NULL,
+      status VARCHAR(20) DEFAULT 'active',
+      razorpay_payment_id VARCHAR(100) DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  `);
+
+  // Payments Table (Payment History & Transactions)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS payments (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      plan_name VARCHAR(50) NOT NULL,
+      amount DECIMAL(10, 2) NOT NULL,
+      currency VARCHAR(10) DEFAULT 'INR',
+      razorpay_order_id VARCHAR(100),
+      razorpay_payment_id VARCHAR(100),
+      status VARCHAR(20) DEFAULT 'success',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
   `);
 
   console.log('Database tables verified/created successfully.');
